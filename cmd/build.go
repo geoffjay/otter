@@ -1,0 +1,113 @@
+package cmd
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/spf13/cobra"
+)
+
+var (
+	buildFile string
+)
+
+var buildCmd = &cobra.Command{
+	Use:   "build",
+	Short: "Build the development environment by applying layers",
+	Long: `Build the development environment by reading the Otterfile/Envfile and applying 
+all defined layers to the current project.`,
+	RunE: runBuild,
+}
+
+func init() {
+	buildCmd.Flags().StringVarP(&buildFile, "file", "f", "", "Specify the Otterfile/Envfile to use (default: auto-detect)")
+}
+
+func runBuild(cmd *cobra.Command, args []string) error {
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	// Check if .otter directory exists
+	otterDir := filepath.Join(currentDir, ".otter")
+	if _, err := os.Stat(otterDir); os.IsNotExist(err) {
+		return fmt.Errorf(".otter directory not found. Please run 'otter init' first")
+	}
+
+	cacheDir := filepath.Join(otterDir, "cache")
+
+	// Find Otterfile if not specified
+	var otterfilePath string
+	if buildFile != "" {
+		otterfilePath = buildFile
+	} else {
+		otterfilePath, err = FindOtterfile()
+		if err != nil {
+			return err
+		}
+	}
+
+	fmt.Printf("Using configuration file: %s\n", otterfilePath)
+
+	// Parse the Otterfile
+	config, err := ParseOtterfile(otterfilePath)
+	if err != nil {
+		return fmt.Errorf("failed to parse %s: %w", otterfilePath, err)
+	}
+
+	if len(config.Layers) == 0 {
+		fmt.Println("No layers defined in configuration file.")
+		return nil
+	}
+
+	fmt.Printf("Found %d layer(s) to process:\n", len(config.Layers))
+
+	// Initialize git and file operations
+	gitOps := NewGitOperations(cacheDir)
+	fileOps := NewFileOperations()
+
+	// Load ignore patterns
+	if err := fileOps.LoadIgnorePatterns(currentDir); err != nil {
+		return fmt.Errorf("failed to load ignore patterns: %w", err)
+	}
+
+	// Process each layer
+	for i, layer := range config.Layers {
+		fmt.Printf("\n[%d/%d] Processing layer: %s\n", i+1, len(config.Layers), layer.Repository)
+
+		// Clone or update the layer
+		layerPath, err := gitOps.CloneOrUpdateLayer(layer.Repository)
+		if err != nil {
+			return fmt.Errorf("failed to process layer %s: %w", layer.Repository, err)
+		}
+
+		// Determine target directory
+		var targetPath string
+		if layer.Target == "." {
+			targetPath = currentDir
+		} else {
+			targetPath = filepath.Join(currentDir, layer.Target)
+		}
+
+		fmt.Printf("  Target directory: %s\n", targetPath)
+
+		// Copy files from layer to target
+		if err := fileOps.CopyLayer(layerPath, targetPath, currentDir); err != nil {
+			return fmt.Errorf("failed to copy layer files: %w", err)
+		}
+
+		// Show commit information
+		commit, err := gitOps.GetRepositoryCommit(layerPath)
+		if err == nil {
+			fmt.Printf("  Layer commit: %s\n", commit[:8])
+		}
+
+		fmt.Printf("  ✓ Layer applied successfully\n")
+	}
+
+	fmt.Printf("\n🎉 Build completed successfully! Applied %d layer(s).\n", len(config.Layers))
+
+	return nil
+}
