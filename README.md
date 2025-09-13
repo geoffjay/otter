@@ -48,10 +48,10 @@ make install
 
 ```bash
 # Run directly
-docker run --rm -it ghcr.io/your-username/otter:latest --help
+docker run --rm -it ghcr.io/geoffjay/otter:latest --help
 
 # Use in a project directory
-docker run --rm -v $(pwd):/workspace -w /workspace ghcr.io/your-username/otter:latest init
+docker run --rm -v $(pwd):/workspace -w /workspace ghcr.io/geoffjay/otter:latest init
 ```
 
 ## Quick Start
