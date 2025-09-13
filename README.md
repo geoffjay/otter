@@ -14,12 +14,12 @@ Otter simplifies development environment setup through a layer concept that pull
 
 ### Option 1: Download Pre-built Binaries
 
-Download the latest release for your platform from the [GitHub Releases](https://github.com/your-username/otter/releases) page.
+Download the latest release for your platform from the [GitHub Releases](https://github.com/geoffjay/otter/releases) page.
 
 ### Option 2: Install with Go
 
 ```bash
-go install github.com/your-username/otter@latest
+go install github.com/geoffjay/otter@latest
 ```
 
 ### Option 3: Build from Source

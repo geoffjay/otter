@@ -1,4 +1,4 @@
-package main
+package util
 
 import (
 	"crypto/sha256"
@@ -25,7 +25,7 @@ func NewGitOperations(cacheDir string) *GitOperations {
 // CloneOrUpdateLayer clones a git repository to the cache directory or updates it if it already exists
 func (g *GitOperations) CloneOrUpdateLayer(repoURL string) (string, error) {
 	// Create a unique directory name based on the repository URL
-	repoName := g.getRepoDirectoryName(repoURL)
+	repoName := g.GetRepoDirectoryName(repoURL)
 	localPath := filepath.Join(g.cacheDir, repoName)
 
 	// Check if repository already exists
@@ -93,7 +93,7 @@ func (g *GitOperations) updateRepository(localPath string) error {
 }
 
 // getRepoDirectoryName creates a unique directory name for a repository URL
-func (g *GitOperations) getRepoDirectoryName(repoURL string) string {
+func (g *GitOperations) GetRepoDirectoryName(repoURL string) string {
 	// Remove common prefixes and suffixes
 	name := strings.TrimSuffix(repoURL, ".git")
 

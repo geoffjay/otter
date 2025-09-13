@@ -1,4 +1,4 @@
-package main
+package util
 
 import (
 	"bufio"
@@ -11,13 +11,13 @@ import (
 
 // FileOperations handles file copying and ignore patterns
 type FileOperations struct {
-	ignorePatterns []string
+	IgnorePatterns []string
 }
 
 // NewFileOperations creates a new FileOperations instance
 func NewFileOperations() *FileOperations {
 	return &FileOperations{
-		ignorePatterns: make([]string, 0),
+		IgnorePatterns: make([]string, 0),
 	}
 }
 
@@ -36,7 +36,7 @@ func (f *FileOperations) LoadIgnorePatterns(projectRoot string) error {
 	}
 	defer file.Close()
 
-	f.ignorePatterns = make([]string, 0)
+	f.IgnorePatterns = make([]string, 0)
 	scanner := bufio.NewScanner(file)
 
 	for scanner.Scan() {
@@ -47,7 +47,7 @@ func (f *FileOperations) LoadIgnorePatterns(projectRoot string) error {
 			continue
 		}
 
-		f.ignorePatterns = append(f.ignorePatterns, line)
+		f.IgnorePatterns = append(f.IgnorePatterns, line)
 	}
 
 	return scanner.Err()
@@ -55,7 +55,7 @@ func (f *FileOperations) LoadIgnorePatterns(projectRoot string) error {
 
 // IsIgnored checks if a file path should be ignored based on ignore patterns
 func (f *FileOperations) IsIgnored(relativePath string) bool {
-	for _, pattern := range f.ignorePatterns {
+	for _, pattern := range f.IgnorePatterns {
 		if f.matchPattern(pattern, relativePath) {
 			return true
 		}

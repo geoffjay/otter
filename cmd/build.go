@@ -5,6 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/geoffjay/otter/file"
+	"github.com/geoffjay/otter/util"
+
 	"github.com/spf13/cobra"
 )
 
@@ -43,7 +46,7 @@ func runBuild(cmd *cobra.Command, args []string) error {
 	if buildFile != "" {
 		otterfilePath = buildFile
 	} else {
-		otterfilePath, err = FindOtterfile()
+		otterfilePath, err = file.FindOtterfile()
 		if err != nil {
 			return err
 		}
@@ -52,7 +55,7 @@ func runBuild(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Using configuration file: %s\n", otterfilePath)
 
 	// Parse the Otterfile
-	config, err := ParseOtterfile(otterfilePath)
+	config, err := file.ParseOtterfile(otterfilePath)
 	if err != nil {
 		return fmt.Errorf("failed to parse %s: %w", otterfilePath, err)
 	}
@@ -65,8 +68,8 @@ func runBuild(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Found %d layer(s) to process:\n", len(config.Layers))
 
 	// Initialize git and file operations
-	gitOps := NewGitOperations(cacheDir)
-	fileOps := NewFileOperations()
+	gitOps := util.NewGitOperations(cacheDir)
+	fileOps := util.NewFileOperations()
 
 	// Load ignore patterns
 	if err := fileOps.LoadIgnorePatterns(currentDir); err != nil {

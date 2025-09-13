@@ -1,9 +1,11 @@
-package main
+package file
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/geoffjay/otter/util"
 )
 
 func TestParseOtterfile(t *testing.T) {
@@ -17,7 +19,7 @@ LAYER https://github.com/example/repo2.git TARGET custom/path
 LAYER git@github.com:example/repo3.git TARGET .config
 `
 
-	err := os.WriteFile(otterfilePath, []byte(content), 0644)
+	err := os.WriteFile(otterfilePath, []byte(content), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test Otterfile: %v", err)
 	}
@@ -62,10 +64,10 @@ LAYER git@github.com:example/repo3.git TARGET .config
 }
 
 func TestFileOperationsIgnore(t *testing.T) {
-	fileOps := NewFileOperations()
+	fileOps := util.NewFileOperations()
 
 	// Test various ignore patterns
-	fileOps.ignorePatterns = []string{
+	fileOps.IgnorePatterns = []string{
 		".git/",
 		"*.log",
 		"node_modules/",
@@ -96,7 +98,7 @@ func TestFileOperationsIgnore(t *testing.T) {
 }
 
 func TestGitOperationsRepoName(t *testing.T) {
-	gitOps := NewGitOperations("/tmp/cache")
+	gitOps := util.NewGitOperations("/tmp/cache")
 
 	testCases := []struct {
 		repoURL  string
@@ -117,7 +119,7 @@ func TestGitOperationsRepoName(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		result := gitOps.getRepoDirectoryName(tc.repoURL)
+		result := gitOps.GetRepoDirectoryName(tc.repoURL)
 		// The result should start with the expected prefix followed by a hash
 		if len(result) <= len(tc.expected) || result[:len(tc.expected)] != tc.expected {
 			t.Errorf("URL %s: expected prefix %s, got %s", tc.repoURL, tc.expected, result)
