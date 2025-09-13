@@ -73,13 +73,13 @@ run-example: build
 
 # Docker targets
 docker-build:
-	docker build -t otter:latest .
+	docker build -t ghcr.io/geoffjay/otter:latest .
 
 docker-run: docker-build
-	docker run --rm -it otter:latest
+	docker run --rm -it ghcr.io/geoffjay/otter:latest
 
 docker-shell: docker-build
-	docker run --rm -it --entrypoint /bin/sh otter:latest
+	docker run --rm -it --entrypoint /bin/sh ghcr.io/geoffjay/otter:latest
 
 # Release target (for GitHub Actions)
 release: clean build-all
