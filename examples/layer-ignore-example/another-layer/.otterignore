@@ -1,0 +1,3 @@
+# Another layer's .otterignore
+secrets.env
+*.bak

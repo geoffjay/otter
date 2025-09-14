@@ -104,12 +104,70 @@ func (f *FileOperations) matchWildcard(pattern, path string) bool {
 	return false
 }
 
+// loadLayerIgnorePatterns loads ignore patterns from a layer's .otterignore file
+func (f *FileOperations) loadLayerIgnorePatterns(layerPath string) ([]string, error) {
+	ignorePath := filepath.Join(layerPath, ".otterignore")
+
+	// If .otterignore doesn't exist in the layer, return empty patterns
+	if _, err := os.Stat(ignorePath); os.IsNotExist(err) {
+		return []string{}, nil
+	}
+
+	file, err := os.Open(ignorePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open layer .otterignore: %w", err)
+	}
+	defer file.Close()
+
+	var patterns []string
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		patterns = append(patterns, line)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading layer .otterignore: %w", err)
+	}
+
+	return patterns, nil
+}
+
+// isIgnoredWithPatterns checks if a file path should be ignored based on given patterns
+func (f *FileOperations) isIgnoredWithPatterns(relativePath string, patterns []string) bool {
+	for _, pattern := range patterns {
+		if f.matchPattern(pattern, relativePath) {
+			return true
+		}
+	}
+	return false
+}
+
 // CopyLayer copies files from a layer directory to the target directory
 func (f *FileOperations) CopyLayer(layerPath, targetPath string, projectRoot string) error {
 	// Ensure target directory exists
 	if err := os.MkdirAll(targetPath, 0755); err != nil {
 		return fmt.Errorf("failed to create target directory %s: %w", targetPath, err)
 	}
+
+	// Load layer-specific ignore patterns and combine with project patterns
+	layerIgnorePatterns, err := f.loadLayerIgnorePatterns(layerPath)
+	if err != nil {
+		return fmt.Errorf("failed to load layer ignore patterns: %w", err)
+	}
+
+	// Combine project-level and layer-level ignore patterns
+	combinedPatterns := append(f.IgnorePatterns, layerIgnorePatterns...)
+
+	// Always ignore .otterignore files themselves (they shouldn't be copied)
+	combinedPatterns = append(combinedPatterns, ".otterignore")
 
 	return filepath.Walk(layerPath, func(srcPath string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -127,8 +185,8 @@ func (f *FileOperations) CopyLayer(layerPath, targetPath string, projectRoot str
 			return nil
 		}
 
-		// Check if this file should be ignored
-		if f.IsIgnored(relativePath) {
+		// Check if this file should be ignored using combined patterns
+		if f.isIgnoredWithPatterns(relativePath, combinedPatterns) {
 			fmt.Printf("  Ignoring: %s\n", relativePath)
 			if info.IsDir() {
 				return filepath.SkipDir

@@ -1,0 +1,5 @@
+# Project-level .otterignore
+# This ignores files at the project level across all layers
+
+README.md
+project-specific.txt

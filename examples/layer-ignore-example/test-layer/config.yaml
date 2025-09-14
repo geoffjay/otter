@@ -1,0 +1,4 @@
+app:
+  name: test-app
+  version: 1.0.0
+# This file should be COPIED

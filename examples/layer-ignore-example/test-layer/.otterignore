@@ -1,0 +1,5 @@
+# Layer-specific .otterignore
+# This file is inside the layer and ignores files specific to this layer
+
+LICENSE
+*.tmp

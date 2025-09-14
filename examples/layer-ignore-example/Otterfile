@@ -1,0 +1,8 @@
+# Layer-Specific .otterignore Example
+# This demonstrates how .otterignore files work in layers
+
+# Local layer with its own .otterignore file
+LAYER ./test-layer TARGET output
+
+# You can have multiple layers each with their own ignore rules
+LAYER ./another-layer TARGET more-output
