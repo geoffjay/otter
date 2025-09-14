@@ -1,7 +1,6 @@
-# Otter ignore file - specify files and patterns to ignore when merging layers
+# Otter ignore file - specify files and patterns to ignore when merging any layer
 .git/
 .otter/
-node_modules/
 *.log
 *.tmp
 .DS_Store

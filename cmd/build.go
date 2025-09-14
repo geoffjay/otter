@@ -124,7 +124,7 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  Target directory: %s\n", targetPath)
 
 		// Copy files from layer to target
-		if err := fileOps.CopyLayer(layerPath, targetPath, currentDir); err != nil {
+		if err := fileOps.CopyLayer(layerPath, targetPath, currentDir, layer.Template); err != nil {
 			return fmt.Errorf("failed to copy layer files: %w", err)
 		}
 

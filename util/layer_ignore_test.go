@@ -65,7 +65,7 @@ func TestLayerSpecificIgnorePatterns(t *testing.T) {
 	}
 
 	// Copy layer to target
-	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot)
+	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot, make(map[string]string))
 	if err != nil {
 		t.Fatalf("Failed to copy layer: %v", err)
 	}
@@ -217,7 +217,7 @@ func TestCombinedIgnorePatterns(t *testing.T) {
 	}
 
 	// Copy layer
-	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot)
+	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot, make(map[string]string))
 	if err != nil {
 		t.Fatalf("Failed to copy layer: %v", err)
 	}
@@ -308,7 +308,7 @@ func TestCriticalFileProtection(t *testing.T) {
 	}
 
 	// Copy layer to target
-	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot)
+	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot, make(map[string]string))
 	if err != nil {
 		t.Fatalf("Failed to copy layer: %v", err)
 	}
@@ -335,6 +335,83 @@ func TestCriticalFileProtection(t *testing.T) {
 	safeFile := filepath.Join(targetDir, "safe-file.txt")
 	if _, err := os.Stat(safeFile); err != nil {
 		t.Errorf("Safe file was not copied: %s", safeFile)
+	}
+}
+
+func TestTemplateProcessing(t *testing.T) {
+	// Test that template variables are properly processed in layer files
+	tempDir := t.TempDir()
+
+	// Create project root
+	projectRoot := filepath.Join(tempDir, "project")
+	err := os.MkdirAll(projectRoot, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create project root: %v", err)
+	}
+
+	// Create layer directory with a template file
+	layerDir := filepath.Join(tempDir, "layer")
+	err = os.MkdirAll(layerDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create layer directory: %v", err)
+	}
+
+	// Create template file content
+	templateContent := `# {{.title}} Project
+
+Author: {{.author}}
+Version: {{.version}}
+Year: {{.year}}
+
+This is a template file for {{.title}}.`
+
+	templateFile := filepath.Join(layerDir, "README.md")
+	err = os.WriteFile(templateFile, []byte(templateContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create template file: %v", err)
+	}
+
+	// Create target directory
+	targetDir := filepath.Join(tempDir, "target")
+
+	// Template variables to use
+	templateVars := map[string]string{
+		"title":   "My Awesome",
+		"author":  "John Doe",
+		"version": "v1.0.0",
+		"year":    "2025",
+	}
+
+	// Initialize FileOperations and copy layer with template variables
+	fileOps := NewFileOperations()
+	err = fileOps.LoadIgnorePatterns(projectRoot)
+	if err != nil {
+		t.Fatalf("Failed to load ignore patterns: %v", err)
+	}
+
+	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot, templateVars)
+	if err != nil {
+		t.Fatalf("Failed to copy layer: %v", err)
+	}
+
+	// Read the processed file
+	processedFile := filepath.Join(targetDir, "README.md")
+	processedContent, err := os.ReadFile(processedFile)
+	if err != nil {
+		t.Fatalf("Failed to read processed file: %v", err)
+	}
+
+	// Verify that template variables were replaced correctly
+	expectedContent := `# My Awesome Project
+
+Author: John Doe
+Version: v1.0.0
+Year: 2025
+
+This is a template file for My Awesome.`
+
+	if string(processedContent) != expectedContent {
+		t.Errorf("Template processing failed.\nExpected:\n%s\n\nGot:\n%s", expectedContent, string(processedContent))
 	}
 }
 

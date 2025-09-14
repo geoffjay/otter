@@ -2,11 +2,12 @@ package util
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
 )
 
 // FileOperations handles file copying and ignore patterns
@@ -151,7 +152,7 @@ func (f *FileOperations) isIgnoredWithPatterns(relativePath string, patterns []s
 }
 
 // CopyLayer copies files from a layer directory to the target directory
-func (f *FileOperations) CopyLayer(layerPath, targetPath string, projectRoot string) error {
+func (f *FileOperations) CopyLayer(layerPath, targetPath string, projectRoot string, templateVars map[string]string) error {
 	// Ensure target directory exists
 	if err := os.MkdirAll(targetPath, 0755); err != nil {
 		return fmt.Errorf("failed to create target directory %s: %w", targetPath, err)
@@ -209,14 +210,14 @@ func (f *FileOperations) CopyLayer(layerPath, targetPath string, projectRoot str
 			// Create directory
 			return os.MkdirAll(destPath, info.Mode())
 		} else {
-			// Copy file
-			return f.copyFile(srcPath, destPath, info.Mode())
+			// Copy file with template processing if variables are provided
+			return f.copyFile(srcPath, destPath, info.Mode(), templateVars)
 		}
 	})
 }
 
-// copyFile copies a single file from src to dst
-func (f *FileOperations) copyFile(src, dst string, mode os.FileMode) error {
+// copyFile copies a single file from src to dst with optional template processing
+func (f *FileOperations) copyFile(src, dst string, mode os.FileMode, templateVars map[string]string) error {
 	// Check if destination file exists and prompt for overwrite
 	if _, err := os.Stat(dst); err == nil {
 		fmt.Printf("  Overwriting: %s\n", dst)
@@ -230,22 +231,55 @@ func (f *FileOperations) copyFile(src, dst string, mode os.FileMode) error {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
-	srcFile, err := os.Open(src)
+	// Read the source file content
+	srcContent, err := os.ReadFile(src)
 	if err != nil {
-		return fmt.Errorf("failed to open source file: %w", err)
+		return fmt.Errorf("failed to read source file: %w", err)
 	}
-	defer srcFile.Close()
 
-	dstFile, err := os.Create(dst)
+	var finalContent []byte
+
+	// Check if we have template variables and the file contains template syntax
+	if len(templateVars) > 0 && f.containsTemplateSyntax(string(srcContent)) {
+		// Process the file as a template
+		processedContent, err := f.processTemplate(string(srcContent), templateVars, src)
+		if err != nil {
+			return fmt.Errorf("failed to process template %s: %w", src, err)
+		}
+		finalContent = []byte(processedContent)
+		fmt.Printf("  Template processed: %s\n", dst)
+	} else {
+		// Copy file as-is
+		finalContent = srcContent
+	}
+
+	// Write the final content to destination
+	if err := os.WriteFile(dst, finalContent, mode); err != nil {
+		return fmt.Errorf("failed to write destination file: %w", err)
+	}
+
+	return nil
+}
+
+// containsTemplateSyntax checks if content contains Go template syntax
+func (f *FileOperations) containsTemplateSyntax(content string) bool {
+	// Check for Go template syntax: {{ .variable }} or {{ .function }}
+	return strings.Contains(content, "{{") && strings.Contains(content, "}}")
+}
+
+// processTemplate processes a template string with the provided variables
+func (f *FileOperations) processTemplate(content string, templateVars map[string]string, filename string) (string, error) {
+	// Create a new template
+	tmpl, err := template.New(filepath.Base(filename)).Parse(content)
 	if err != nil {
-		return fmt.Errorf("failed to create destination file: %w", err)
-	}
-	defer dstFile.Close()
-
-	if _, err := io.Copy(dstFile, srcFile); err != nil {
-		return fmt.Errorf("failed to copy file content: %w", err)
+		return "", fmt.Errorf("failed to parse template: %w", err)
 	}
 
-	// Set file permissions
-	return os.Chmod(dst, mode)
+	// Execute the template with the variables
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, templateVars); err != nil {
+		return "", fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	return buf.String(), nil
 }
