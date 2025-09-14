@@ -65,7 +65,22 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Printf("Found %d layer(s) to process:\n", len(config.Layers))
+	// Filter applicable layers based on conditions
+	applicableLayers, err := config.FilterApplicableLayers()
+	if err != nil {
+		return fmt.Errorf("failed to filter applicable layers: %w", err)
+	}
+
+	if len(applicableLayers) == 0 {
+		fmt.Println("No layers are applicable for current environment.")
+		return nil
+	}
+
+	if len(applicableLayers) < len(config.Layers) {
+		fmt.Printf("Found %d layer(s), applying %d layer(s) based on conditions:\n", len(config.Layers), len(applicableLayers))
+	} else {
+		fmt.Printf("Found %d layer(s) to process:\n", len(applicableLayers))
+	}
 
 	// Initialize git and file operations
 	gitOps := util.NewGitOperations(cacheDir)
@@ -76,9 +91,12 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load ignore patterns: %w", err)
 	}
 
-	// Process each layer
-	for i, layer := range config.Layers {
-		fmt.Printf("\n[%d/%d] Processing layer: %s\n", i+1, len(config.Layers), layer.Repository)
+	// Process each applicable layer
+	for i, layer := range applicableLayers {
+		fmt.Printf("\n[%d/%d] Processing layer: %s\n", i+1, len(applicableLayers), layer.Repository)
+		if layer.Condition != "" {
+			fmt.Printf("  Condition: %s\n", layer.Condition)
+		}
 
 		// Clone or update the layer
 		layerPath, err := gitOps.CloneOrUpdateLayer(layer.Repository)

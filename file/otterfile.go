@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 )
 
@@ -11,6 +12,13 @@ import (
 type Layer struct {
 	Repository string
 	Target     string // Optional target directory, defaults to root
+	Condition  string // Optional condition for applying the layer (e.g., "env=development")
+}
+
+// Condition represents a parsed condition for layer application
+type Condition struct {
+	Key   string
+	Value string
 }
 
 // OtterfileConfig holds the parsed configuration from Otterfile/Envfile
@@ -82,7 +90,7 @@ func parseLayerCommand(args []string, config *OtterfileConfig) error {
 		Target:     ".", // Default to current directory
 	}
 
-	// Parse optional TARGET argument
+	// Parse optional TARGET and IF arguments
 	for i := 1; i < len(args); i++ {
 		arg := strings.ToUpper(args[i])
 		switch arg {
@@ -92,6 +100,12 @@ func parseLayerCommand(args []string, config *OtterfileConfig) error {
 			}
 			layer.Target = args[i+1]
 			i++ // Skip the next argument as it's the target path
+		case "IF":
+			if i+1 >= len(args) {
+				return fmt.Errorf("IF requires a condition argument")
+			}
+			layer.Condition = args[i+1]
+			i++ // Skip the next argument as it's the condition
 		default:
 			return fmt.Errorf("unknown LAYER argument: %s", args[i])
 		}
@@ -112,4 +126,98 @@ func FindOtterfile() (string, error) {
 	}
 
 	return "", fmt.Errorf("no Otterfile or Envfile found in current directory")
+}
+
+// parseCondition parses a condition string (e.g., "env=development")
+func parseCondition(conditionStr string) (*Condition, error) {
+	if conditionStr == "" {
+		return nil, fmt.Errorf("condition cannot be empty")
+	}
+
+	parts := strings.SplitN(conditionStr, "=", 2)
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("condition must be in format 'key=value', got: %s", conditionStr)
+	}
+
+	return &Condition{
+		Key:   strings.TrimSpace(parts[0]),
+		Value: strings.TrimSpace(parts[1]),
+	}, nil
+}
+
+// evaluateCondition evaluates a condition against the current environment
+func evaluateCondition(condition *Condition) (bool, error) {
+	if condition == nil {
+		return true, nil
+	}
+
+	switch condition.Key {
+	case "os":
+		return condition.Value == runtime.GOOS, nil
+	case "arch":
+		return condition.Value == runtime.GOARCH, nil
+	case "env", "environment":
+		envValue := os.Getenv("OTTER_ENV")
+		if envValue == "" {
+			envValue = os.Getenv("ENV")
+		}
+		if envValue == "" {
+			envValue = os.Getenv("NODE_ENV")
+		}
+		if envValue == "" {
+			envValue = "development" // Default to development
+		}
+		return condition.Value == envValue, nil
+	case "editor":
+		editorValue := os.Getenv("OTTER_EDITOR")
+		if editorValue == "" {
+			editorValue = os.Getenv("EDITOR")
+		}
+		if editorValue == "" {
+			// Try to detect common editors
+			if _, err := os.Stat(".vscode"); err == nil {
+				editorValue = "vscode"
+			} else if _, err := os.Stat(".cursor"); err == nil {
+				editorValue = "cursor"
+			}
+		}
+		return condition.Value == editorValue, nil
+	default:
+		// Check for custom environment variables
+		envVarName := "OTTER_" + strings.ToUpper(condition.Key)
+		envValue := os.Getenv(envVarName)
+		return condition.Value == envValue, nil
+	}
+}
+
+// ShouldApplyLayer determines if a layer should be applied based on its condition
+func (l *Layer) ShouldApplyLayer() (bool, error) {
+	if l.Condition == "" {
+		return true, nil // No condition means always apply
+	}
+
+	condition, err := parseCondition(l.Condition)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse condition '%s': %w", l.Condition, err)
+	}
+
+	return evaluateCondition(condition)
+}
+
+// FilterApplicableLayers filters layers based on their conditions
+func (config *OtterfileConfig) FilterApplicableLayers() ([]Layer, error) {
+	var applicableLayers []Layer
+
+	for _, layer := range config.Layers {
+		shouldApply, err := layer.ShouldApplyLayer()
+		if err != nil {
+			return nil, fmt.Errorf("error evaluating condition for layer %s: %w", layer.Repository, err)
+		}
+
+		if shouldApply {
+			applicableLayers = append(applicableLayers, layer)
+		}
+	}
+
+	return applicableLayers, nil
 }
