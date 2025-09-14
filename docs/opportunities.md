@@ -33,7 +33,7 @@ LAYER git@github.com:otter-layers/ci-cd.git DEPENDS base,go-setup
 
 ### 📋 Variables & Templating
 
-State: Not implemented
+State: Implemented
 
 ```
 # Define variables

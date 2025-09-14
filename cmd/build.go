@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/geoffjay/otter/file"
 	"github.com/geoffjay/otter/util"
@@ -96,6 +97,14 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		fmt.Printf("\n[%d/%d] Processing layer: %s\n", i+1, len(applicableLayers), layer.Repository)
 		if layer.Condition != "" {
 			fmt.Printf("  Condition: %s\n", layer.Condition)
+		}
+		if len(layer.Template) > 0 {
+			fmt.Printf("  Template variables: ")
+			var templateVars []string
+			for k, v := range layer.Template {
+				templateVars = append(templateVars, fmt.Sprintf("%s=%s", k, v))
+			}
+			fmt.Printf("%s\n", strings.Join(templateVars, ", "))
 		}
 
 		// Clone or update the layer

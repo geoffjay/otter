@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"regexp"
 	"runtime"
 	"strings"
 )
@@ -11,8 +12,9 @@ import (
 // Layer represents a single layer definition from the Otterfile
 type Layer struct {
 	Repository string
-	Target     string // Optional target directory, defaults to root
-	Condition  string // Optional condition for applying the layer (e.g., "env=development")
+	Target     string            // Optional target directory, defaults to root
+	Condition  string            // Optional condition for applying the layer (e.g., "env=development")
+	Template   map[string]string // Optional template variables to pass to the layer
 }
 
 // Condition represents a parsed condition for layer application
@@ -23,7 +25,8 @@ type Condition struct {
 
 // OtterfileConfig holds the parsed configuration from Otterfile/Envfile
 type OtterfileConfig struct {
-	Layers []Layer
+	Variables map[string]string // Variables defined with VAR command
+	Layers    []Layer
 }
 
 // ParseOtterfile reads and parses an Otterfile or Envfile
@@ -35,7 +38,8 @@ func ParseOtterfile(filename string) (*OtterfileConfig, error) {
 	defer file.Close()
 
 	config := &OtterfileConfig{
-		Layers: make([]Layer, 0),
+		Variables: make(map[string]string),
+		Layers:    make([]Layer, 0),
 	}
 
 	scanner := bufio.NewScanner(file)
@@ -72,11 +76,41 @@ func parseLine(line string, config *OtterfileConfig, lineNumber int) error {
 	command := strings.ToUpper(parts[0])
 
 	switch command {
+	case "VAR":
+		return parseVarCommand(parts[1:], config)
 	case "LAYER":
 		return parseLayerCommand(parts[1:], config)
 	default:
 		return fmt.Errorf("unknown command: %s", command)
 	}
+}
+
+// parseVarCommand parses a VAR command
+func parseVarCommand(args []string, config *OtterfileConfig) error {
+	if len(args) == 0 {
+		return fmt.Errorf("VAR command requires a variable definition")
+	}
+
+	// Join all args back into a single string in case the value contains spaces
+	varDef := strings.Join(args, " ")
+
+	// Split on the first '=' to separate key and value
+	parts := strings.SplitN(varDef, "=", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("VAR command must be in format 'KEY=VALUE', got: %s", varDef)
+	}
+
+	key := strings.TrimSpace(parts[0])
+	value := strings.TrimSpace(parts[1])
+
+	if key == "" {
+		return fmt.Errorf("variable name cannot be empty")
+	}
+
+	// Apply variable substitution to the value using previously defined variables
+	resolvedValue := substituteVariables(value, config.Variables)
+	config.Variables[key] = resolvedValue
+	return nil
 }
 
 // parseLayerCommand parses a LAYER command
@@ -88,9 +122,10 @@ func parseLayerCommand(args []string, config *OtterfileConfig) error {
 	layer := Layer{
 		Repository: args[0],
 		Target:     ".", // Default to current directory
+		Template:   make(map[string]string),
 	}
 
-	// Parse optional TARGET and IF arguments
+	// Parse optional TARGET, IF, and TEMPLATE arguments
 	for i := 1; i < len(args); i++ {
 		arg := strings.ToUpper(args[i])
 		switch arg {
@@ -106,13 +141,72 @@ func parseLayerCommand(args []string, config *OtterfileConfig) error {
 			}
 			layer.Condition = args[i+1]
 			i++ // Skip the next argument as it's the condition
+		case "TEMPLATE":
+			if i+1 >= len(args) {
+				return fmt.Errorf("TEMPLATE requires template variable assignments")
+			}
+			// Parse template variables (key=value format, possibly multiple)
+			for j := i + 1; j < len(args); j++ {
+				if strings.Contains(args[j], "=") {
+					parts := strings.SplitN(args[j], "=", 2)
+					if len(parts) == 2 {
+						key := strings.TrimSpace(parts[0])
+						value := strings.TrimSpace(parts[1])
+						layer.Template[key] = value
+					}
+				} else {
+					// This argument doesn't contain '=', so it's likely a different argument type
+					i = j - 1 // Back up one step so the outer loop processes this argument
+					break
+				}
+				i = j // Move the outer loop index forward
+			}
 		default:
 			return fmt.Errorf("unknown LAYER argument: %s", args[i])
 		}
 	}
 
+	// Apply variable substitution to repository URL and target
+	layer.Repository = substituteVariables(layer.Repository, config.Variables)
+	layer.Target = substituteVariables(layer.Target, config.Variables)
+
+	// Apply variable substitution to template values
+	for key, value := range layer.Template {
+		layer.Template[key] = substituteVariables(value, config.Variables)
+	}
+
 	config.Layers = append(config.Layers, layer)
 	return nil
+}
+
+// substituteVariables replaces ${VAR_NAME} placeholders with actual variable values
+func substituteVariables(text string, variables map[string]string) string {
+	// Regular expression to match ${VAR_NAME} patterns
+	re := regexp.MustCompile(`\$\{([^}]+)\}`)
+
+	return re.ReplaceAllStringFunc(text, func(match string) string {
+		// Extract the variable name from ${VAR_NAME}
+		varName := match[2 : len(match)-1] // Remove ${ and }
+
+		// First check custom variables defined in Otterfile
+		if value, exists := variables[varName]; exists {
+			return value
+		}
+
+		// Then check environment variables (with OTTER_ prefix)
+		envVarName := "OTTER_" + strings.ToUpper(varName)
+		if value := os.Getenv(envVarName); value != "" {
+			return value
+		}
+
+		// Finally check direct environment variables
+		if value := os.Getenv(varName); value != "" {
+			return value
+		}
+
+		// If variable is not found, return the original placeholder
+		return match
+	})
 }
 
 // FindOtterfile looks for Otterfile or Envfile in the current directory

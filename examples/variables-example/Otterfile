@@ -1,0 +1,46 @@
+# Variables & Templating Example Otterfile
+# This demonstrates the new Variables & Templating feature
+
+# Project Configuration Variables
+VAR PROJECT_NAME=example-microservice
+VAR VERSION=v1.2.3
+VAR ORGANIZATION=mycompany
+
+# Technology Stack Variables
+VAR LANGUAGE=go
+VAR DATABASE=postgres
+VAR CACHE=redis
+
+# Infrastructure Variables  
+VAR CLOUD_PROVIDER=aws
+VAR REGION=us-west-2
+
+# Derived Variables (using variable substitution)
+VAR SERVICE_IMAGE=${ORGANIZATION}/${PROJECT_NAME}:${VERSION}
+VAR BASE_PATH=services/${PROJECT_NAME}
+
+# Base project structure
+LAYER git@github.com:${ORGANIZATION}/project-base.git TEMPLATE project=${PROJECT_NAME} org=${ORGANIZATION}
+
+# Language-specific setup with variables
+LAYER git@github.com:${ORGANIZATION}/${LANGUAGE}-setup.git TARGET ${BASE_PATH} TEMPLATE version=${VERSION}
+
+# Database configuration using variables
+LAYER git@github.com:${ORGANIZATION}/${DATABASE}-config.git TARGET ${BASE_PATH}/database TEMPLATE db_name=${PROJECT_NAME}_db
+
+# Cache configuration
+LAYER git@github.com:${ORGANIZATION}/${CACHE}-setup.git TARGET ${BASE_PATH}/cache
+
+# Environment-specific configurations
+LAYER git@github.com:${ORGANIZATION}/dev-config.git TARGET config IF env=development TEMPLATE project=${PROJECT_NAME} database=${DATABASE}
+LAYER git@github.com:${ORGANIZATION}/prod-config.git TARGET config IF env=production TEMPLATE project=${PROJECT_NAME} image=${SERVICE_IMAGE} region=${REGION}
+
+# Docker configuration with template variables
+LAYER git@github.com:${ORGANIZATION}/dockerfile-${LANGUAGE}.git TEMPLATE base_image=golang:1.21-alpine project=${PROJECT_NAME} version=${VERSION}
+
+# Kubernetes manifests for production
+LAYER git@github.com:${ORGANIZATION}/k8s-manifests.git TARGET k8s IF env=production TEMPLATE service=${PROJECT_NAME} image=${SERVICE_IMAGE} replicas=${REPLICAS} namespace=${ORGANIZATION}-${PROJECT_NAME}
+
+# Editor-specific configurations
+LAYER git@github.com:${ORGANIZATION}/vscode-${LANGUAGE}.git TARGET .vscode IF editor=vscode TEMPLATE project=${PROJECT_NAME}
+LAYER git@github.com:${ORGANIZATION}/cursor-rules.git TARGET .cursor IF editor=cursor TEMPLATE language=${LANGUAGE} framework=microservice
