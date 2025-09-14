@@ -55,7 +55,11 @@ LAYER <repository-url> [TARGET <target-path>] [IF <condition>] [TEMPLATE <key=va
 
 ### Parameters
 
-- **`<repository-url>`** (required): The git repository URL containing the layer files
+- **`<repository-url>`** (required): The layer source - can be:
+  - Git repository URL (e.g., `git@github.com:user/repo.git`)
+  - Local directory path (e.g., `./layers/my-layer`)
+  - Absolute path (e.g., `/path/to/layer`)
+  - File URI (e.g., `file:///absolute/path/to/layer`)
 - **`TARGET <target-path>`** (optional): The directory where layer files should be copied (default: current directory)
 - **`IF <condition>`** (optional): A condition that must be met for the layer to be applied
 - **`TEMPLATE <key=value>...`** (optional): Template variables to pass to the layer
@@ -80,6 +84,268 @@ LAYER git@github.com:otter-layers/${DATABASE}-setup.git TARGET database
 
 # Complex layer with all parameters
 LAYER git@github.com:otter-layers/service-config.git TARGET services/${SERVICE_NAME} IF env=production TEMPLATE version=${VERSION} database=${DATABASE}
+
+# Local directory layers
+LAYER ./layers/base-config TARGET config
+LAYER ../shared/common-layer TARGET shared
+
+# Absolute path layer
+LAYER /company/shared/security-baseline
+
+# File URI layer
+LAYER file:///path/to/shared/layer TARGET shared
+```
+
+## Local Layers
+
+Local layers allow you to use directories on your local filesystem as layer sources instead of remote Git repositories. This is particularly useful for development, testing, and rapid iteration.
+
+### Local Layer Types
+
+#### Relative Path Layers
+
+```dockerfile
+# Relative to current directory
+LAYER ./layers/dev-config
+LAYER ./layers/database-setup TARGET database
+
+# Relative to parent directory
+LAYER ../shared/common-config TARGET config
+```
+
+#### Absolute Path Layers
+
+```dockerfile
+# Unix/Linux/macOS absolute path
+LAYER /company/shared/base-layer
+
+# Windows absolute path
+LAYER C:/shared/layers/windows-config
+
+# Network path (if supported by OS)
+LAYER //server/shared/layer TARGET network
+```
+
+#### File URI Layers
+
+```dockerfile
+# File URI with absolute path
+LAYER file:///absolute/path/to/layer
+
+# File URI useful for cross-platform paths
+LAYER file://C:/shared/layer TARGET windows IF os=windows
+LAYER file:///shared/layer TARGET unix IF os!=windows
+```
+
+### Local Layer Benefits
+
+#### 1. **Rapid Development and Testing**
+
+```dockerfile
+# Modify ./layers/my-config locally and test immediately
+LAYER ./layers/my-config TARGET config
+
+# No need to commit and push to remote repository
+```
+
+#### 2. **Mixed Local and Remote Layers**
+
+```dockerfile
+# Use local layers for development
+LAYER ./layers/dev-tools IF env=development
+
+# Use remote layers for production
+LAYER git@github.com:company/prod-config.git IF env=production
+```
+
+#### 3. **Shared Team Resources**
+
+```dockerfile
+# Reference shared company layers
+LAYER file:///company/shared/security-policies TARGET security
+LAYER file:///company/shared/docker-configs TARGET docker
+```
+
+### Development Workflow
+
+#### 1. **Create Local Layer**
+
+```bash
+# Create a local layer directory
+mkdir -p ./layers/my-layer
+echo "config: value" > ./layers/my-layer/config.yaml
+```
+
+#### 2. **Use in Otterfile**
+
+```dockerfile
+# Reference the local layer
+LAYER ./layers/my-layer TARGET config
+```
+
+#### 3. **Test and Iterate**
+
+```bash
+# Test the layer
+otter build
+
+# Modify layer files
+echo "new_config: new_value" >> ./layers/my-layer/config.yaml
+
+# Test again immediately
+otter build
+```
+
+#### 4. **Graduate to Remote Repository**
+
+```bash
+# When ready, create a remote repository
+git init ./layers/my-layer
+cd ./layers/my-layer
+git remote add origin git@github.com:company/my-layer.git
+git push -u origin main
+
+# Update Otterfile
+# LAYER ./layers/my-layer TARGET config              # Local
+# LAYER git@github.com:company/my-layer.git TARGET config  # Remote
+```
+
+### Local Layer Validation
+
+Local layers are validated when processed:
+
+- **Directory exists**: The path must point to an existing directory
+- **Directory accessible**: Must have read permissions
+- **Path resolution**: Relative paths are resolved to absolute paths
+
+### Local Layer Examples
+
+#### Multi-Environment Setup
+
+```dockerfile
+# Base configuration (always applied)
+LAYER ./layers/base-config
+
+# Environment-specific local layers
+LAYER ./layers/dev-environment IF env=development
+LAYER ./layers/staging-environment IF env=staging
+
+# Remote production layer (more controlled)
+LAYER git@github.com:company/prod-config.git IF env=production
+```
+
+#### Team Development Setup
+
+```dockerfile
+# Individual developer layers
+LAYER ./layers/personal-dev-config TARGET dev
+
+# Shared team layers from network storage
+LAYER file:///team/shared/coding-standards TARGET standards
+LAYER file:///team/shared/docker-setup TARGET docker
+
+# Project-specific layers
+LAYER ./layers/project-config TARGET config
+```
+
+#### Platform-Specific Layers
+
+```dockerfile
+# Local platform-specific configurations
+LAYER ./layers/macos-dev IF os=darwin
+LAYER ./layers/linux-dev IF os=linux
+LAYER ./layers/windows-dev IF os=windows
+
+# Shared platform tools
+LAYER file:///company/platform/macos TARGET platform IF os=darwin
+LAYER file:///company/platform/linux TARGET platform IF os=linux
+```
+
+#### Template Variables with Local Layers
+
+```dockerfile
+VAR PROJECT_NAME=my-app
+VAR TEAM=backend
+
+# Local layer with template variables
+LAYER ./layers/app-config TARGET config TEMPLATE project=${PROJECT_NAME} team=${TEAM}
+
+# The config files in ./layers/app-config can use ${project} and ${team}
+```
+
+### Best Practices
+
+#### 1. **Layer Organization**
+
+```
+project/
+├── Otterfile
+├── layers/                    # Local layers
+│   ├── base-config/
+│   ├── dev-tools/
+│   ├── test-setup/
+│   └── app-specific/
+└── src/                      # Application code
+```
+
+#### 2. **Naming Conventions**
+
+```dockerfile
+# Use descriptive names
+LAYER ./layers/database-config TARGET database
+LAYER ./layers/api-gateway-config TARGET gateway
+
+# Avoid generic names
+# LAYER ./layers/config1          # Bad
+# LAYER ./layers/stuff            # Bad
+```
+
+#### 3. **Environment Separation**
+
+```dockerfile
+# Keep environment-specific layers separate
+LAYER ./layers/base-config                          # Common
+LAYER ./layers/dev-overrides IF env=development     # Dev-specific
+LAYER ./layers/prod-overrides IF env=production     # Prod-specific
+```
+
+#### 4. **Documentation**
+
+```dockerfile
+# Comment your local layers
+# Base application configuration
+LAYER ./layers/app-config TARGET config
+
+# Development tools and utilities
+LAYER ./layers/dev-tools IF env=development TARGET tools
+
+# Platform-specific development setup
+LAYER ./layers/macos-setup IF os=darwin TARGET platform
+```
+
+### Migration Strategies
+
+#### From Remote to Local (for development)
+
+```dockerfile
+# Step 1: Clone remote layer locally
+# git clone git@github.com:company/layer.git ./layers/layer
+
+# Step 2: Update Otterfile
+# LAYER git@github.com:company/layer.git      # Old
+LAYER ./layers/layer                          # New
+
+# Step 3: Develop and test locally
+# Step 4: Push changes back to remote when ready
+```
+
+#### From Local to Remote (for sharing)
+
+```dockerfile
+# Step 1: Create remote repository for local layer
+# Step 2: Update Otterfile
+# LAYER ./layers/shared-config                        # Local only
+LAYER git@github.com:company/shared-config.git       # Now remote
 ```
 
 ## Conditional Layers

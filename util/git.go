@@ -3,6 +3,7 @@ package util
 import (
 	"crypto/sha256"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,8 +23,88 @@ func NewGitOperations(cacheDir string) *GitOperations {
 	}
 }
 
-// CloneOrUpdateLayer clones a git repository to the cache directory or updates it if it already exists
+// CloneOrUpdateLayer clones a git repository to the cache directory, updates it if it already exists,
+// or returns the path directly for local layers
 func (g *GitOperations) CloneOrUpdateLayer(repoURL string) (string, error) {
+	// Check if this is a local layer
+	if g.isLocalLayer(repoURL) {
+		return g.handleLocalLayer(repoURL)
+	}
+
+	// Handle remote git repository
+	return g.handleRemoteRepository(repoURL)
+}
+
+// isLocalLayer checks if the repository URL refers to a local directory
+func (g *GitOperations) isLocalLayer(repoURL string) bool {
+	// Check for relative paths
+	if strings.HasPrefix(repoURL, "./") || strings.HasPrefix(repoURL, "../") {
+		return true
+	}
+
+	// Check for absolute paths
+	if strings.HasPrefix(repoURL, "/") {
+		return true
+	}
+
+	// Check for file:// URI scheme
+	if strings.HasPrefix(repoURL, "file://") {
+		return true
+	}
+
+	// Check for Windows paths (C:\ etc.)
+	if len(repoURL) >= 3 && repoURL[1] == ':' && (repoURL[2] == '\\' || repoURL[2] == '/') {
+		return true
+	}
+
+	return false
+}
+
+// handleLocalLayer processes a local directory layer
+func (g *GitOperations) handleLocalLayer(repoURL string) (string, error) {
+	var localPath string
+
+	// Handle file:// URI scheme
+	if strings.HasPrefix(repoURL, "file://") {
+		parsedURL, err := url.Parse(repoURL)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse file:// URL %s: %w", repoURL, err)
+		}
+		localPath = parsedURL.Path
+	} else {
+		localPath = repoURL
+	}
+
+	// Convert to absolute path if it's relative
+	if !filepath.IsAbs(localPath) {
+		absPath, err := filepath.Abs(localPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve absolute path for %s: %w", localPath, err)
+		}
+		localPath = absPath
+	}
+
+	// Verify the directory exists
+	if _, err := os.Stat(localPath); err != nil {
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("local layer directory does not exist: %s", localPath)
+		}
+		return "", fmt.Errorf("failed to access local layer directory %s: %w", localPath, err)
+	}
+
+	// Verify it's actually a directory
+	if stat, err := os.Stat(localPath); err != nil {
+		return "", fmt.Errorf("failed to stat local layer path %s: %w", localPath, err)
+	} else if !stat.IsDir() {
+		return "", fmt.Errorf("local layer path is not a directory: %s", localPath)
+	}
+
+	fmt.Printf("Using local layer: %s\n", localPath)
+	return localPath, nil
+}
+
+// handleRemoteRepository processes a remote git repository (existing logic)
+func (g *GitOperations) handleRemoteRepository(repoURL string) (string, error) {
 	// Create a unique directory name based on the repository URL
 	repoName := g.GetRepoDirectoryName(repoURL)
 	localPath := filepath.Join(g.cacheDir, repoName)
@@ -120,8 +201,18 @@ func (g *GitOperations) GetRepoDirectoryName(repoURL string) string {
 	return fmt.Sprintf("%s-%s", name, hashStr)
 }
 
-// GetRepositoryCommit gets the current commit hash of a repository
+// GetRepositoryCommit gets the current commit hash of a repository, or returns info for local layers
 func (g *GitOperations) GetRepositoryCommit(localPath string) (string, error) {
+	// Check if this is a git repository
+	if _, err := os.Stat(filepath.Join(localPath, ".git")); err != nil {
+		if os.IsNotExist(err) {
+			// Not a git repository, return directory info
+			return "local-dir", nil
+		}
+		return "", err
+	}
+
+	// It's a git repository, get commit info
 	repo, err := git.PlainOpen(localPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to open repository: %w", err)

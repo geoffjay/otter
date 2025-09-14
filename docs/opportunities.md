@@ -122,7 +122,7 @@ GROUP production {
 
 ### 🌐 Local Layers & Layer Discovery
 
-State: Not implemented
+State: Partially implemented (Local Layers ✅, Layer Discovery 🔄)
 
 ```
 # Local directory layers

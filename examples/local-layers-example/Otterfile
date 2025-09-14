@@ -1,0 +1,25 @@
+# Local Layers Example Otterfile
+# This demonstrates the new Local Layers feature
+
+# Variables for the example
+VAR PROJECT_NAME=local-example
+VAR ENVIRONMENT=development
+
+# Local layer using relative path
+LAYER ./layers/base-config TARGET config
+
+# Local layer using relative path with subdirectory
+LAYER ./layers/dev-tools IF env=development
+
+# File URI for absolute path (useful for shared layers across projects)
+# LAYER file:///path/to/shared/layer TARGET shared
+
+# You can still mix local and remote layers
+# LAYER git@github.com:otter-layers/monitoring.git IF env=production
+
+# Local layer with template variables
+LAYER ./layers/app-config TARGET app TEMPLATE project=${PROJECT_NAME} env=${ENVIRONMENT}
+
+# Local layer with multiple conditions
+LAYER ./layers/editor-config TARGET .config IF editor=vscode
+LAYER ./layers/macos-specific IF os=darwin TARGET platform

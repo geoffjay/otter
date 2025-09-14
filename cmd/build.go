@@ -131,7 +131,11 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		// Show commit information
 		commit, err := gitOps.GetRepositoryCommit(layerPath)
 		if err == nil {
-			fmt.Printf("  Layer commit: %s\n", commit[:8])
+			if commit == "local-dir" {
+				fmt.Printf("  Layer type: Local directory\n")
+			} else {
+				fmt.Printf("  Layer commit: %s\n", commit[:8])
+			}
 		}
 
 		fmt.Printf("  ✓ Layer applied successfully\n")
