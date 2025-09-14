@@ -189,13 +189,13 @@ func TestCombinedIgnorePatterns(t *testing.T) {
 		t.Fatalf("Failed to create layer .otterignore: %v", err)
 	}
 
-	// Create test files
+	// Create test files (excluding .otterignore which was already created above)
 	testFiles := []string{
 		"project-ignore.txt", // Should be ignored by project patterns
 		"layer-ignore.txt",   // Should be ignored by layer patterns
 		"shared-ignore.txt",  // Should be ignored by both (duplicate pattern)
 		"keep-this.txt",      // Should NOT be ignored
-		".otterignore",       // Should be ignored automatically
+		// Note: .otterignore was already created above and shouldn't be overwritten
 	}
 
 	for _, filename := range testFiles {
@@ -238,6 +238,103 @@ func TestCombinedIgnorePatterns(t *testing.T) {
 		if _, err := os.Stat(filePath); err == nil {
 			t.Errorf("File %s should have been ignored but was copied", filename)
 		}
+	}
+}
+
+func TestCriticalFileProtection(t *testing.T) {
+	// Test that critical files/directories (.git, .otter, .otterignore) are NEVER copied from layers
+	tempDir := t.TempDir()
+
+	// Create project root
+	projectRoot := filepath.Join(tempDir, "project")
+	err := os.MkdirAll(projectRoot, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create project root: %v", err)
+	}
+
+	// Create layer directory with critical files that should NEVER be copied
+	layerDir := filepath.Join(tempDir, "layer")
+	err = os.MkdirAll(layerDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create layer directory: %v", err)
+	}
+
+	// Create .git directory in layer (this should NEVER be copied)
+	gitDir := filepath.Join(layerDir, ".git")
+	err = os.MkdirAll(gitDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create .git directory: %v", err)
+	}
+
+	// Create .otter directory in layer (this should NEVER be copied)
+	otterDir := filepath.Join(layerDir, ".otter")
+	err = os.MkdirAll(otterDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create .otter directory: %v", err)
+	}
+
+	// Create critical files that should NEVER be copied
+	criticalFiles := map[string]string{
+		".git/config":       "[core]\n  repositoryformatversion = 0",
+		".git/HEAD":         "ref: refs/heads/main",
+		".otter/cache.json": "{}",
+		".otterignore":      "*.tmp",
+		".gitignore":        "*.log\n*.tmp\nnode_modules/",
+		"safe-file.txt":     "This file should be copied",
+	}
+
+	for filename, content := range criticalFiles {
+		filePath := filepath.Join(layerDir, filename)
+		// Ensure directory exists for nested files
+		dir := filepath.Dir(filePath)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("Failed to create directory for %s: %v", filename, err)
+		}
+
+		err := os.WriteFile(filePath, []byte(content), 0644)
+		if err != nil {
+			t.Fatalf("Failed to create critical file %s: %v", filename, err)
+		}
+	}
+
+	// Create target directory
+	targetDir := filepath.Join(tempDir, "target")
+
+	// Initialize FileOperations and copy layer
+	fileOps := NewFileOperations()
+	err = fileOps.LoadIgnorePatterns(projectRoot)
+	if err != nil {
+		t.Fatalf("Failed to load project ignore patterns: %v", err)
+	}
+
+	// Copy layer to target
+	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot)
+	if err != nil {
+		t.Fatalf("Failed to copy layer: %v", err)
+	}
+
+	// Verify that critical files/directories were NOT copied
+	criticalItems := []string{
+		".git",
+		".git/config",
+		".git/HEAD",
+		".otter",
+		".otter/cache.json",
+		".otterignore",
+		".gitignore",
+	}
+
+	for _, item := range criticalItems {
+		itemPath := filepath.Join(targetDir, item)
+		if _, err := os.Stat(itemPath); err == nil {
+			t.Errorf("CRITICAL SECURITY ISSUE: %s was copied from layer to target (this should NEVER happen)", item)
+		}
+	}
+
+	// Verify that safe files WERE copied
+	safeFile := filepath.Join(targetDir, "safe-file.txt")
+	if _, err := os.Stat(safeFile); err != nil {
+		t.Errorf("Safe file was not copied: %s", safeFile)
 	}
 }
 

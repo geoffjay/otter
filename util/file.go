@@ -166,8 +166,16 @@ func (f *FileOperations) CopyLayer(layerPath, targetPath string, projectRoot str
 	// Combine project-level and layer-level ignore patterns
 	combinedPatterns := append(f.IgnorePatterns, layerIgnorePatterns...)
 
-	// Always ignore .otterignore files themselves (they shouldn't be copied)
-	combinedPatterns = append(combinedPatterns, ".otterignore")
+	// CRITICAL: Always ignore these files/directories to prevent dangerous overwrites
+	criticalIgnorePatterns := []string{
+		".git",         // Never copy .git folder from layers (would overwrite project's git repo)
+		".git/",        // Directory pattern for .git
+		".otter",       // Never copy .otter cache folder from layers
+		".otter/",      // Directory pattern for .otter
+		".otterignore", // Never copy .otterignore files from layers
+		".gitignore",   // Never copy .gitignore files from layers (would overwrite project's git ignore rules)
+	}
+	combinedPatterns = append(combinedPatterns, criticalIgnorePatterns...)
 
 	return filepath.Walk(layerPath, func(srcPath string, info os.FileInfo, err error) error {
 		if err != nil {
