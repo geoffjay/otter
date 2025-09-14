@@ -1,4 +1,8 @@
-🎯 Conditional Layers & Environment-Aware Setup
+# Opportunities
+
+## Features
+
+### 🎯 Conditional Layers & Environment-Aware Setup
 
 State: Implemented
 
@@ -15,7 +19,7 @@ LAYER git@github.com:otter-layers/macos-dev.git IF os=darwin
 LAYER git@github.com:otter-layers/linux-dev.git IF os=linux
 ```
 
-🔗 Layer Dependencies & Composition
+### 🔗 Layer Dependencies & Composition
 
 State: Not implemented
 
@@ -27,7 +31,7 @@ LAYER git@github.com:otter-layers/testing-tools.git DEPENDS base
 LAYER git@github.com:otter-layers/ci-cd.git DEPENDS base,go-setup
 ```
 
-📋 Variables & Templating
+### 📋 Variables & Templating
 
 State: Not implemented
 
@@ -43,7 +47,7 @@ LAYER git@github.com:otter-layers/${DATABASE}-setup.git
 LAYER git@github.com:otter-layers/dockerfile.git TEMPLATE go_version=${GO_VERSION}
 ```
 
-📌 Version Pinning & Layer Metadata
+### 📌 Version Pinning & Layer Metadata
 
 State: Not implemented
 
@@ -61,7 +65,7 @@ LAYER git@github.com:otter-layers/auth.git {
 }
 ```
 
-🎛️ Interactive Mode & Profiles
+### 🎛️ Interactive Mode & Profiles
 
 State: Not implemented
 
@@ -78,7 +82,7 @@ otter init --profile go-cli
 otter init --profile react-app
 ```
 
-🔄 Hooks & Lifecycle Events
+### 🔄 Hooks & Lifecycle Events
 
 State: Not implemented
 
@@ -95,7 +99,7 @@ ON_AFTER_BUILD: ["make deps", "make test"]
 ON_ERROR: ["echo 'Build failed, cleaning up...'", "make clean"]
 ```
 
-🏗️ Multi-Stage & Grouped Layers
+### 🏗️ Multi-Stage & Grouped Layers
 
 State: Not implemented
 
@@ -116,7 +120,7 @@ GROUP production {
 # otter build --group development
 ```
 
-🌐 Local Layers & Layer Discovery
+### 🌐 Local Layers & Layer Discovery
 
 State: Not implemented
 
@@ -134,7 +138,7 @@ LAYER otter://registry/user/my-custom-template
 # otter info otter://registry/popular/go-web-api
 ```
 
-🧪 Layer Validation & Testing
+### 🧪 Layer Validation & Testing
 
 State: Not implemented
 
@@ -148,7 +152,7 @@ LAYER git@github.com:otter-layers/api-base.git {
 }
 ```
 
-⚡ Performance & Caching Improvements
+### ⚡ Performance & Caching Improvements
 
 State: Not implemented
 
@@ -164,7 +168,7 @@ PARALLEL {
 LAYER git@github.com:otter-layers/large-assets.git CACHE checksum
 ```
 
-🔧 Enhanced CLI Commands
+### 🔧 Enhanced CLI Commands
 
 State: Not implemented
 
@@ -186,7 +190,7 @@ otter template create my-template        # Create template from current project
 otter template publish my-template       # Publish to registry
 ```
 
-📊 Configuration Inheritance & Overrides
+### 📊 Configuration Inheritance & Overrides
 
 State: Not implemented
 
