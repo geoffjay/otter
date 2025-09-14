@@ -103,6 +103,7 @@ jobs:
     name: Build Docker Image
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       packages: write
     needs: build
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -130,6 +131,11 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
+          labels: |
+            org.opencontainers.image.title=Otter CLI
+            org.opencontainers.image.description=Development environment setup through layered templates
+            org.opencontainers.image.vendor=${{ github.repository_owner }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
