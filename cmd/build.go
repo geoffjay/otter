@@ -83,13 +83,25 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Found %d layer(s) to process:\n", len(applicableLayers))
 	}
 
-	// Initialize git and file operations
+	// Initialize git, file, and command operations
 	gitOps := util.NewGitOperations(cacheDir)
 	fileOps := util.NewFileOperations()
+	cmdExec := util.NewCommandExecutor(currentDir)
 
 	// Load ignore patterns
 	if err := fileOps.LoadIgnorePatterns(currentDir); err != nil {
 		return fmt.Errorf("failed to load ignore patterns: %w", err)
+	}
+
+	// Execute global before build hooks
+	if len(config.OnBeforeBuild) > 0 {
+		fmt.Printf("\nExecuting global before build hooks:\n")
+		if err := cmdExec.ExecuteCommands(config.OnBeforeBuild, "before build"); err != nil {
+			if len(config.OnError) > 0 {
+				cmdExec.ExecuteCommands(config.OnError, "error cleanup")
+			}
+			return fmt.Errorf("before build hook failed: %w", err)
+		}
 	}
 
 	// Process each applicable layer
@@ -107,9 +119,22 @@ func runBuild(cmd *cobra.Command, args []string) error {
 			fmt.Printf("%s\n", strings.Join(templateVars, ", "))
 		}
 
+		// Execute before hooks for this layer
+		if len(layer.Before) > 0 {
+			if err := cmdExec.ExecuteCommands(layer.Before, "before layer"); err != nil {
+				if len(config.OnError) > 0 {
+					cmdExec.ExecuteCommands(config.OnError, "error cleanup")
+				}
+				return fmt.Errorf("before hook failed for layer %s: %w", layer.Repository, err)
+			}
+		}
+
 		// Clone or update the layer
 		layerPath, err := gitOps.CloneOrUpdateLayer(layer.Repository)
 		if err != nil {
+			if len(config.OnError) > 0 {
+				cmdExec.ExecuteCommands(config.OnError, "error cleanup")
+			}
 			return fmt.Errorf("failed to process layer %s: %w", layer.Repository, err)
 		}
 
@@ -125,6 +150,9 @@ func runBuild(cmd *cobra.Command, args []string) error {
 
 		// Copy files from layer to target
 		if err := fileOps.CopyLayer(layerPath, targetPath, currentDir, layer.Template); err != nil {
+			if len(config.OnError) > 0 {
+				cmdExec.ExecuteCommands(config.OnError, "error cleanup")
+			}
 			return fmt.Errorf("failed to copy layer files: %w", err)
 		}
 
@@ -138,7 +166,28 @@ func runBuild(cmd *cobra.Command, args []string) error {
 			}
 		}
 
+		// Execute after hooks for this layer
+		if len(layer.After) > 0 {
+			if err := cmdExec.ExecuteCommands(layer.After, "after layer"); err != nil {
+				if len(config.OnError) > 0 {
+					cmdExec.ExecuteCommands(config.OnError, "error cleanup")
+				}
+				return fmt.Errorf("after hook failed for layer %s: %w", layer.Repository, err)
+			}
+		}
+
 		fmt.Printf("  ✓ Layer applied successfully\n")
+	}
+
+	// Execute global after build hooks
+	if len(config.OnAfterBuild) > 0 {
+		fmt.Printf("\nExecuting global after build hooks:\n")
+		if err := cmdExec.ExecuteCommands(config.OnAfterBuild, "after build"); err != nil {
+			if len(config.OnError) > 0 {
+				cmdExec.ExecuteCommands(config.OnError, "error cleanup")
+			}
+			return fmt.Errorf("after build hook failed: %w", err)
+		}
 	}
 
 	fmt.Printf("\n🎉 Build completed successfully! Applied %d layer(s).\n", len(config.Layers))

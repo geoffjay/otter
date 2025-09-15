@@ -1,0 +1,6 @@
+# Simple hooks test
+ON_BEFORE_BUILD: ["echo 'Starting hooks test...'"]
+ON_AFTER_BUILD: ["echo 'Hooks test completed!'"]  
+ON_ERROR: ["echo 'Something went wrong!'"]
+
+LAYER ./simple-layer BEFORE ["echo 'Before layer hook'"] AFTER ["echo 'After layer hook'"]

@@ -1,0 +1,17 @@
+# Hooks & Lifecycle Events Example
+# This demonstrates how to use hooks for documentation site generation and other automation
+
+# Global hooks - executed for the entire build process
+ON_BEFORE_BUILD: ["echo 'Starting Otter build process...'", "mkdir -p temp"]
+ON_AFTER_BUILD: ["echo 'Build completed successfully!'", "rm -rf temp"]
+ON_ERROR: ["echo 'Build failed - cleaning up...'", "rm -rf temp", "echo 'Cleanup completed'"]
+
+# Documentation layer with hooks for static site generation
+# This would be perfect for your use case!
+LAYER ./docs-layer AFTER ["hugo mod init docs", "npm install", "echo 'Documentation site ready!'"]
+
+# Development tools layer with setup hooks
+LAYER ./dev-tools BEFORE ["echo 'Setting up development environment...'"] AFTER ["chmod +x scripts/*.sh", "./scripts/setup-dev-env.sh"]
+
+# Database layer with initialization hooks  
+LAYER ./database-layer BEFORE ["echo 'Preparing database setup...'"] AFTER ["./scripts/init-db.sh", "echo 'Database initialized'"]

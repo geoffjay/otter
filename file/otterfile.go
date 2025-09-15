@@ -2,6 +2,7 @@ package file
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
@@ -15,6 +16,8 @@ type Layer struct {
 	Target     string            // Optional target directory, defaults to root
 	Condition  string            // Optional condition for applying the layer (e.g., "env=development")
 	Template   map[string]string // Optional template variables to pass to the layer
+	Before     []string          // Commands to run before applying the layer
+	After      []string          // Commands to run after applying the layer
 }
 
 // Condition represents a parsed condition for layer application
@@ -25,8 +28,11 @@ type Condition struct {
 
 // OtterfileConfig holds the parsed configuration from Otterfile/Envfile
 type OtterfileConfig struct {
-	Variables map[string]string // Variables defined with VAR command
-	Layers    []Layer
+	Variables     map[string]string // Variables defined with VAR command
+	Layers        []Layer
+	OnBeforeBuild []string // Global commands to run before build
+	OnAfterBuild  []string // Global commands to run after build
+	OnError       []string // Global commands to run on error
 }
 
 // ParseOtterfile reads and parses an Otterfile or Envfile
@@ -80,6 +86,12 @@ func parseLine(line string, config *OtterfileConfig, lineNumber int) error {
 		return parseVarCommand(parts[1:], config)
 	case "LAYER":
 		return parseLayerCommand(parts[1:], config)
+	case "ON_BEFORE_BUILD:":
+		return parseGlobalHookCommand(parts[1:], &config.OnBeforeBuild)
+	case "ON_AFTER_BUILD:":
+		return parseGlobalHookCommand(parts[1:], &config.OnAfterBuild)
+	case "ON_ERROR:":
+		return parseGlobalHookCommand(parts[1:], &config.OnError)
 	default:
 		return fmt.Errorf("unknown command: %s", command)
 	}
@@ -110,6 +122,25 @@ func parseVarCommand(args []string, config *OtterfileConfig) error {
 	// Apply variable substitution to the value using previously defined variables
 	resolvedValue := substituteVariables(value, config.Variables)
 	config.Variables[key] = resolvedValue
+	return nil
+}
+
+// parseGlobalHookCommand parses a global hook command (ON_BEFORE_BUILD, ON_AFTER_BUILD, ON_ERROR)
+func parseGlobalHookCommand(args []string, hookSlice *[]string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("hook command requires command array")
+	}
+
+	// Join all args to handle JSON array syntax: ["cmd1", "cmd2"]
+	jsonStr := strings.Join(args, " ")
+
+	// Parse as JSON array
+	var commands []string
+	if err := json.Unmarshal([]byte(jsonStr), &commands); err != nil {
+		return fmt.Errorf("failed to parse hook commands as JSON array: %w", err)
+	}
+
+	*hookSlice = commands
 	return nil
 }
 
@@ -161,6 +192,52 @@ func parseLayerCommand(args []string, config *OtterfileConfig) error {
 				}
 				i = j // Move the outer loop index forward
 			}
+		case "BEFORE":
+			if i+1 >= len(args) {
+				return fmt.Errorf("BEFORE requires a command array")
+			}
+			// Find the JSON array for BEFORE commands
+			jsonStart := i + 1
+			if !strings.HasPrefix(args[jsonStart], "[") {
+				return fmt.Errorf("BEFORE commands must be in JSON array format")
+			}
+			// Find the end of the JSON array
+			jsonEnd := jsonStart
+			for jsonEnd < len(args) && !strings.HasSuffix(args[jsonEnd], "]") {
+				jsonEnd++
+			}
+			if jsonEnd >= len(args) {
+				return fmt.Errorf("BEFORE command array not properly closed")
+			}
+			// Parse the JSON array
+			jsonStr := strings.Join(args[jsonStart:jsonEnd+1], " ")
+			if err := json.Unmarshal([]byte(jsonStr), &layer.Before); err != nil {
+				return fmt.Errorf("failed to parse BEFORE commands: %w", err)
+			}
+			i = jsonEnd // Skip processed arguments
+		case "AFTER":
+			if i+1 >= len(args) {
+				return fmt.Errorf("AFTER requires a command array")
+			}
+			// Find the JSON array for AFTER commands
+			jsonStart := i + 1
+			if !strings.HasPrefix(args[jsonStart], "[") {
+				return fmt.Errorf("AFTER commands must be in JSON array format")
+			}
+			// Find the end of the JSON array
+			jsonEnd := jsonStart
+			for jsonEnd < len(args) && !strings.HasSuffix(args[jsonEnd], "]") {
+				jsonEnd++
+			}
+			if jsonEnd >= len(args) {
+				return fmt.Errorf("AFTER command array not properly closed")
+			}
+			// Parse the JSON array
+			jsonStr := strings.Join(args[jsonStart:jsonEnd+1], " ")
+			if err := json.Unmarshal([]byte(jsonStr), &layer.After); err != nil {
+				return fmt.Errorf("failed to parse AFTER commands: %w", err)
+			}
+			i = jsonEnd // Skip processed arguments
 		default:
 			return fmt.Errorf("unknown LAYER argument: %s", args[i])
 		}
