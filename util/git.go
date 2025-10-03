@@ -203,6 +203,14 @@ func (g *GitOperations) GetRepoDirectoryName(repoURL string) string {
 
 // GetRepositoryCommit gets the current commit hash of a repository, or returns info for local layers
 func (g *GitOperations) GetRepositoryCommit(localPath string) (string, error) {
+	// Check if the directory exists first
+	if _, err := os.Stat(localPath); err != nil {
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("directory does not exist: %s", localPath)
+		}
+		return "", fmt.Errorf("failed to access directory: %w", err)
+	}
+
 	// Check if this is a git repository
 	if _, err := os.Stat(filepath.Join(localPath, ".git")); err != nil {
 		if os.IsNotExist(err) {

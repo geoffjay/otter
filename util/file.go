@@ -84,6 +84,15 @@ func (f *FileOperations) matchPattern(pattern, path string) bool {
 		return f.matchWildcard(pattern, path)
 	}
 
+	// Filename pattern (pattern doesn't contain /, should match filename in any directory)
+	if !strings.Contains(pattern, "/") {
+		pathParts := strings.Split(path, "/")
+		filename := pathParts[len(pathParts)-1]
+		if pattern == filename {
+			return true
+		}
+	}
+
 	// Prefix match
 	return strings.HasPrefix(path, pattern)
 }
