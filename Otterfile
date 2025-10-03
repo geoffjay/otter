@@ -1,7 +1,7 @@
 VAR AUTHOR=Geoff Johnson
 
-LAYER ./layers/license-mit TEMPLATE author=${AUTHOR} year=2025
+LAYER git@github.com:otter-layers/license-mit TEMPLATE author=${AUTHOR} year=2025
 LAYER git@github.com:otter-layers/cursor-rules-base.git
 
 # testing
-LAYER ./layers/otterignore-test
+LAYER ../otter-layers/otterignore-test

@@ -50,3 +50,6 @@ Thumbs.db
 
 # Local layer development
 layers/
+
+# claude
+.claude/settings.local.json
