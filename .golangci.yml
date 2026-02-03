@@ -1,23 +1,21 @@
+version: "2"
+
 run:
   timeout: 5m
-  issues-exit-code: 1
   tests: true
   modules-download-mode: readonly
 
 output:
-  format: colored-line-number
-  print-issued-lines: true
-  print-linter-name: true
-  uniq-by-line: true
+  formats:
+    colored-line-number: {}
 
 linters:
+  default: none
   enable:
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
-    - typecheck
     - unused
     - bodyclose
     - contextcheck
@@ -27,15 +25,10 @@ linters:
     - errname
     - errorlint
     - exhaustive
-    - exportloopref
     - forcetypeassert
     - goconst
     - gocritic
-    - gofmt
-    - gofumpt
     - goheader
-    - goimports
-    - gomnd
     - goprintffuncname
     - gosec
     - lll
@@ -51,70 +44,78 @@ linters:
     - revive
     - rowserrcheck
     - sqlclosecheck
-    - stylecheck
     - thelper
     - tparallel
     - unconvert
     - unparam
     - wastedassign
     - whitespace
+    - mnd
 
-linters-settings:
-  govet:
-    check-shadowing: true
-  gofmt:
-    simplify: true
-  goimports:
-    local-prefixes: otter
-  lll:
-    line-length: 120
-  misspell:
-    locale: US
-  nolintlint:
-    allow-leading-space: true
-    allow-unused: false
-    require-explanation: false
-    require-specific: false
-  gocritic:
-    enabled-tags:
-      - performance
-      - style
-      - experimental
-    disabled-checks:
-      - wrapperFunc
-      - hugeParam
-  cyclop:
-    max-complexity: 15
-  gomnd:
-    settings:
-      mnd:
-        checks:
-          - argument
-          - case
-          - condition
-          - operation
-          - return
-          - assign
-        ignored-numbers: 0,1,2,3
-        ignored-functions: strings.SplitN
+  settings:
+    govet:
+      shadow: true
+    lll:
+      line-length: 120
+    misspell:
+      locale: US
+    nolintlint:
+      allow-unused: false
+      require-explanation: false
+      require-specific: false
+    gocritic:
+      enabled-tags:
+        - performance
+        - style
+        - experimental
+      disabled-checks:
+        - wrapperFunc
+        - hugeParam
+    cyclop:
+      max-complexity: 15
+    mnd:
+      checks:
+        - argument
+        - case
+        - condition
+        - operation
+        - return
+        - assign
+      ignored-numbers:
+        - "0"
+        - "1"
+        - "2"
+        - "3"
+      ignored-functions:
+        - strings.SplitN
 
-issues:
-  exclude-rules:
-    # Exclude some linters from running on tests files
-    - path: _test\.go
-      linters:
-        - gomnd
-        - goconst
-        - dupl
-        - lll
-    # Exclude known linters from partially hard-to-fix issues
-    - path: cmd_.*\.go
-      linters:
-        - lll
-    # Exclude shadow checking on the variable named err
-    - text: 'shadow: declaration of "err"'
-      linters:
-        - govet
-  exclude-use-default: false
-  max-issues-per-linter: 0
-  max-same-issues: 0
+  exclusions:
+    rules:
+      # Exclude some linters from running on tests files
+      - path: _test\.go
+        linters:
+          - mnd
+          - goconst
+          - dupl
+          - lll
+      # Exclude known linters from partially hard-to-fix issues
+      - path: cmd_.*\.go
+        linters:
+          - lll
+      # Exclude shadow checking on the variable named err
+      - text: 'shadow: declaration of "err"'
+        linters:
+          - govet
+
+formatters:
+  enable:
+    - gofmt
+    - gofumpt
+    - goimports
+
+  settings:
+    gofmt:
+      simplify: true
+    goimports:
+      local-prefixes:
+        - otter
