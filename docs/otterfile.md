@@ -1,10 +1,12 @@
 # Otterfile Documentation
 
-The Otterfile is the core configuration file for Otter, defining which layers to apply to your development environment. This document covers the complete syntax and features available.
+The Otterfile is the core configuration file for Otter, defining which layers to apply to your development environment.
+This document covers the complete syntax and features available.
 
 ## Basic Syntax
 
-An Otterfile uses a Dockerfile-like syntax with commands written in uppercase. Each command operates on a single line (multi-line commands are not currently supported).
+An Otterfile uses a Dockerfile-like syntax with commands written in uppercase. Each command operates on a single line
+(multi-line commands are not currently supported).
 
 ### Comments
 
@@ -98,7 +100,8 @@ LAYER file:///path/to/shared/layer TARGET shared
 
 ## Local Layers
 
-Local layers allow you to use directories on your local filesystem as layer sources instead of remote Git repositories. This is particularly useful for development, testing, and rapid iteration.
+Local layers allow you to use directories on your local filesystem as layer sources instead of remote Git repositories.
+This is particularly useful for development, testing, and rapid iteration.
 
 ### Local Layer Types
 
@@ -350,7 +353,8 @@ LAYER git@github.com:company/shared-config.git       # Now remote
 
 ## Conditional Layers
 
-Conditional layers allow you to apply different configurations based on your environment, operating system, editor, or custom variables.
+Conditional layers allow you to apply different configurations based on your environment, operating system, editor, or
+custom variables.
 
 ### Condition Syntax
 
@@ -469,7 +473,8 @@ otter build
 
 ## Variables & Templating
 
-Variables and templating provide powerful ways to make your Otterfiles dynamic and reusable across different environments and projects.
+Variables and templating provide powerful ways to make your Otterfiles dynamic and reusable across different
+environments and projects.
 
 ### Variable Definition
 
@@ -661,6 +666,160 @@ set -e
 
 # Run otter build
 otter build
+```
+
+## Hooks & Lifecycle Events
+
+Hooks allow you to execute shell commands at various points during the build process. This is useful for setup scripts,
+validation, cleanup, and post-processing.
+
+### Global Hooks
+
+Global hooks execute once per build, regardless of how many layers are applied.
+
+#### ON_BEFORE_BUILD
+
+Runs before any layers are processed. Use this for pre-build setup, validation, or environment preparation.
+
+```dockerfile
+ON_BEFORE_BUILD: ["echo 'Starting build...'"]
+ON_BEFORE_BUILD: ["./scripts/validate-env.sh", "mkdir -p tmp"]
+```
+
+#### ON_AFTER_BUILD
+
+Runs after all layers have been successfully applied. Use this for post-build tasks like running tests, installing
+dependencies, or generating documentation.
+
+```dockerfile
+ON_AFTER_BUILD: ["go mod tidy"]
+ON_AFTER_BUILD: ["npm install", "npm run build"]
+```
+
+#### ON_ERROR
+
+Runs when any error occurs during the build process (including hook failures). Use this for cleanup, notifications, or
+error handling.
+
+```dockerfile
+ON_ERROR: ["echo 'Build failed, cleaning up...'"]
+ON_ERROR: ["./scripts/cleanup.sh", "rm -rf tmp"]
+```
+
+### Per-Layer Hooks
+
+Per-layer hooks execute for each layer individually, allowing layer-specific setup and post-processing.
+
+#### BEFORE
+
+Runs immediately before a layer's files are copied. Use this for layer-specific preparation.
+
+```dockerfile
+LAYER git@github.com:otter-layers/database.git BEFORE ["chmod +x scripts/*.sh"]
+LAYER git@github.com:otter-layers/config.git BEFORE ["mkdir -p config", "backup-existing.sh"]
+```
+
+#### AFTER
+
+Runs immediately after a layer's files are copied successfully. Use this for layer-specific post-processing.
+
+```dockerfile
+LAYER git@github.com:otter-layers/go-project.git AFTER ["go mod tidy"]
+LAYER git@github.com:otter-layers/npm-setup.git AFTER ["npm install", "npm run setup"]
+```
+
+### Hook Syntax
+
+Hooks use JSON array syntax for specifying commands:
+
+```dockerfile
+# Single command
+ON_BEFORE_BUILD: ["echo 'hello'"]
+
+# Multiple commands (executed sequentially)
+ON_AFTER_BUILD: ["go mod tidy", "go build ./...", "go test ./..."]
+
+# Layer hooks can be combined with other parameters
+LAYER git@github.com:example/layer.git TARGET config IF env=production BEFORE ["validate.sh"] AFTER ["post-setup.sh"]
+```
+
+### Execution Order
+
+The build process executes hooks in this order:
+
+1. **ON_BEFORE_BUILD** hooks (once at start)
+2. For each layer:
+   - **BEFORE** hooks for the layer
+   - Clone/update and copy layer files
+   - **AFTER** hooks for the layer
+3. **ON_AFTER_BUILD** hooks (once at end)
+
+If any step fails:
+- The build process stops immediately
+- **ON_ERROR** hooks are executed (if defined)
+- The build command exits with an error
+
+### Error Handling
+
+- Each command in a hook array runs sequentially
+- If any command fails (non-zero exit code), the build stops
+- ON_ERROR hooks are always attempted when an error occurs
+- Hook commands inherit the current working directory (project root)
+
+### Examples
+
+#### Basic Setup with Hooks
+
+```dockerfile
+# Validate environment before starting
+ON_BEFORE_BUILD: ["./scripts/check-deps.sh"]
+
+# Base layer
+LAYER git@github.com:otter-layers/go-base.git
+
+# Database layer with setup script
+LAYER git@github.com:otter-layers/postgres-config.git AFTER ["./scripts/db-init.sh"]
+
+# Run tests after build
+ON_AFTER_BUILD: ["go test ./..."]
+
+# Cleanup on failure
+ON_ERROR: ["echo 'Build failed'", "./scripts/cleanup.sh"]
+```
+
+#### Environment-Specific Hooks
+
+```dockerfile
+VAR PROJECT_NAME=my-api
+
+# Development setup
+LAYER git@github.com:otter-layers/dev-tools.git IF env=development AFTER ["npm install", "npm run dev:setup"]
+
+# Production setup with validation
+LAYER git@github.com:otter-layers/prod-config.git IF env=production BEFORE ["./scripts/prod-validate.sh"] AFTER ["./scripts/prod-verify.sh"]
+
+ON_AFTER_BUILD: ["echo 'Build complete for ${PROJECT_NAME}'"]
+```
+
+#### Complex Multi-Layer Setup
+
+```dockerfile
+ON_BEFORE_BUILD: ["echo 'Starting build...'", "mkdir -p .otter/tmp"]
+
+# Base configuration
+LAYER git@github.com:otter-layers/base-config.git
+
+# API layer with dependency installation
+LAYER git@github.com:otter-layers/go-api.git TARGET api BEFORE ["mkdir -p api"] AFTER ["cd api && go mod download"]
+
+# Frontend layer with build step
+LAYER git@github.com:otter-layers/react-app.git TARGET web AFTER ["cd web && npm install && npm run build"]
+
+# Docker configuration
+LAYER git@github.com:otter-layers/docker-compose.git AFTER ["docker-compose config --quiet"]
+
+ON_AFTER_BUILD: ["echo 'All layers applied successfully'", "./scripts/final-setup.sh"]
+ON_ERROR: ["echo 'Build failed, see logs for details'", "rm -rf .otter/tmp"]
 ```
 
 ## Complete Examples

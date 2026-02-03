@@ -84,7 +84,7 @@ otter init --profile react-app
 
 ### 🔄 Hooks & Lifecycle Events
 
-State: Not implemented
+State: Implemented
 
 ```
 # Pre/post hooks for layers

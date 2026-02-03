@@ -13,7 +13,8 @@ import (
 )
 
 var (
-	buildFile string
+	buildFile  string
+	forceApply bool
 )
 
 var buildCmd = &cobra.Command{
@@ -26,6 +27,7 @@ all defined layers to the current project.`,
 
 func init() {
 	buildCmd.Flags().StringVarP(&buildFile, "file", "f", "", "Specify the Otterfile/Envfile to use (default: auto-detect)")
+	buildCmd.Flags().BoolVarP(&forceApply, "force", "F", false, "Force apply layers without prompting for file overwrites")
 }
 
 func runBuild(cmd *cobra.Command, args []string) error {
@@ -149,7 +151,7 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  Target directory: %s\n", targetPath)
 
 		// Copy files from layer to target
-		if err := fileOps.CopyLayer(layerPath, targetPath, currentDir, layer.Template); err != nil {
+		if err := fileOps.CopyLayer(layerPath, targetPath, currentDir, layer.Template, forceApply); err != nil {
 			if len(config.OnError) > 0 {
 				cmdExec.ExecuteCommands(config.OnError, "error cleanup")
 			}

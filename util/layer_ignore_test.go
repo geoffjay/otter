@@ -64,8 +64,8 @@ func TestLayerSpecificIgnorePatterns(t *testing.T) {
 		t.Fatalf("Failed to load project ignore patterns: %v", err)
 	}
 
-	// Copy layer to target
-	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot, make(map[string]string))
+	// Copy layer to target (force=true to skip prompts in tests)
+	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot, make(map[string]string), true)
 	if err != nil {
 		t.Fatalf("Failed to copy layer: %v", err)
 	}
@@ -216,8 +216,8 @@ func TestCombinedIgnorePatterns(t *testing.T) {
 		t.Fatalf("Failed to load project ignore patterns: %v", err)
 	}
 
-	// Copy layer
-	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot, make(map[string]string))
+	// Copy layer (force=true to skip prompts in tests)
+	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot, make(map[string]string), true)
 	if err != nil {
 		t.Fatalf("Failed to copy layer: %v", err)
 	}
@@ -307,8 +307,8 @@ func TestCriticalFileProtection(t *testing.T) {
 		t.Fatalf("Failed to load project ignore patterns: %v", err)
 	}
 
-	// Copy layer to target
-	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot, make(map[string]string))
+	// Copy layer to target (force=true to skip prompts in tests)
+	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot, make(map[string]string), true)
 	if err != nil {
 		t.Fatalf("Failed to copy layer: %v", err)
 	}
@@ -389,7 +389,7 @@ This is a template file for {{.title}}.`
 		t.Fatalf("Failed to load ignore patterns: %v", err)
 	}
 
-	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot, templateVars)
+	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot, templateVars, true)
 	if err != nil {
 		t.Fatalf("Failed to copy layer: %v", err)
 	}

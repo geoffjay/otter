@@ -15,6 +15,13 @@ type FileOperations struct {
 	IgnorePatterns []string
 }
 
+// FileConflict tracks files that would be overwritten during a layer copy
+type FileConflict struct {
+	RelativePath string
+	SourcePath   string
+	DestPath     string
+}
+
 // NewFileOperations creates a new FileOperations instance
 func NewFileOperations() *FileOperations {
 	return &FileOperations{
@@ -160,11 +167,119 @@ func (f *FileOperations) isIgnoredWithPatterns(relativePath string, patterns []s
 	return false
 }
 
+// DetectConflicts scans a layer directory and returns files that would be overwritten
+func (f *FileOperations) DetectConflicts(layerPath, targetPath string) ([]FileConflict, error) {
+	var conflicts []FileConflict
+
+	// Load layer-specific ignore patterns and combine with project patterns
+	layerIgnorePatterns, err := f.loadLayerIgnorePatterns(layerPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load layer ignore patterns: %w", err)
+	}
+
+	// Combine project-level and layer-level ignore patterns
+	combinedPatterns := append(f.IgnorePatterns, layerIgnorePatterns...)
+
+	// CRITICAL: Always ignore these files/directories
+	criticalIgnorePatterns := []string{
+		".git",
+		".git/",
+		".otter",
+		".otter/",
+		".otterignore",
+		".gitignore",
+	}
+	combinedPatterns = append(combinedPatterns, criticalIgnorePatterns...)
+
+	err = filepath.Walk(layerPath, func(srcPath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Get relative path from layer root
+		relativePath, err := filepath.Rel(layerPath, srcPath)
+		if err != nil {
+			return fmt.Errorf("failed to get relative path: %w", err)
+		}
+
+		// Skip the root directory itself
+		if relativePath == "." {
+			return nil
+		}
+
+		// Check if this file should be ignored
+		if f.isIgnoredWithPatterns(relativePath, combinedPatterns) {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// Skip directories - we only care about file conflicts
+		if info.IsDir() {
+			return nil
+		}
+
+		// Calculate destination path
+		destPath := filepath.Join(targetPath, relativePath)
+
+		// Check if destination file exists
+		if _, err := os.Stat(destPath); err == nil {
+			conflicts = append(conflicts, FileConflict{
+				RelativePath: relativePath,
+				SourcePath:   srcPath,
+				DestPath:     destPath,
+			})
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return conflicts, nil
+}
+
+// PromptForConfirmation prompts the user for y/n confirmation and returns true if confirmed
+func PromptForConfirmation(prompt string) bool {
+	fmt.Print(prompt)
+	scanner := bufio.NewScanner(os.Stdin)
+	if scanner.Scan() {
+		response := strings.ToLower(strings.TrimSpace(scanner.Text()))
+		return response == "y" || response == "yes"
+	}
+	return false
+}
+
 // CopyLayer copies files from a layer directory to the target directory
-func (f *FileOperations) CopyLayer(layerPath, targetPath string, projectRoot string, templateVars map[string]string) error {
+// If force is false and there are file conflicts, the user will be prompted for confirmation
+func (f *FileOperations) CopyLayer(layerPath, targetPath string, projectRoot string, templateVars map[string]string, force bool) error {
 	// Ensure target directory exists
 	if err := os.MkdirAll(targetPath, 0755); err != nil {
 		return fmt.Errorf("failed to create target directory %s: %w", targetPath, err)
+	}
+
+	// Detect conflicts if not forcing
+	if !force {
+		conflicts, err := f.DetectConflicts(layerPath, targetPath)
+		if err != nil {
+			return fmt.Errorf("failed to detect conflicts: %w", err)
+		}
+
+		if len(conflicts) > 0 {
+			fmt.Printf("\n  The following files will be overwritten:\n")
+			for _, conflict := range conflicts {
+				fmt.Printf("    - %s\n", conflict.RelativePath)
+			}
+			fmt.Println()
+
+			if !PromptForConfirmation("  Do you want to proceed? [y/N]: ") {
+				return fmt.Errorf("build aborted by user")
+			}
+			fmt.Println()
+		}
 	}
 
 	// Load layer-specific ignore patterns and combine with project patterns
