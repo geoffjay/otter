@@ -63,6 +63,145 @@ LAYER git@github.com:example/repo3.git TARGET .config
 	}
 }
 
+func TestParseOtterfileWithLineContinuation(t *testing.T) {
+	tempDir := t.TempDir()
+
+	tests := []struct {
+		name           string
+		content        string
+		expectedLayers int
+		checkLayer     func(*testing.T, []Layer)
+		expectError    bool
+		errorContains  string
+	}{
+		{
+			name: "Simple line continuation",
+			content: `LAYER git@github.com:example/repo.git \
+  TARGET output`,
+			expectedLayers: 1,
+			checkLayer: func(t *testing.T, layers []Layer) {
+				if layers[0].Repository != "git@github.com:example/repo.git" {
+					t.Errorf("Expected repo, got %s", layers[0].Repository)
+				}
+				if layers[0].Target != "output" {
+					t.Errorf("Expected target 'output', got %s", layers[0].Target)
+				}
+			},
+		},
+		{
+			name: "Multi-line with hooks",
+			content: `LAYER ./test-layer \
+  TARGET output \
+  AFTER ["echo 'done'"]`,
+			expectedLayers: 1,
+			checkLayer: func(t *testing.T, layers []Layer) {
+				if layers[0].Target != "output" {
+					t.Errorf("Expected target 'output', got %s", layers[0].Target)
+				}
+				if len(layers[0].After) != 1 || layers[0].After[0] != "echo 'done'" {
+					t.Errorf("Expected AFTER hook, got %v", layers[0].After)
+				}
+			},
+		},
+		{
+			name: "Complex multi-line with all options",
+			content: `LAYER git@github.com:example/repo.git \
+  TARGET config \
+  IF env=production \
+  BEFORE ["mkdir -p config"] \
+  AFTER ["echo 'setup complete'"]`,
+			expectedLayers: 1,
+			checkLayer: func(t *testing.T, layers []Layer) {
+				if layers[0].Target != "config" {
+					t.Errorf("Expected target 'config', got %s", layers[0].Target)
+				}
+				if layers[0].Condition != "env=production" {
+					t.Errorf("Expected condition 'env=production', got %s", layers[0].Condition)
+				}
+				if len(layers[0].Before) != 1 {
+					t.Errorf("Expected 1 BEFORE hook, got %d", len(layers[0].Before))
+				}
+				if len(layers[0].After) != 1 {
+					t.Errorf("Expected 1 AFTER hook, got %d", len(layers[0].After))
+				}
+			},
+		},
+		{
+			name: "Mixed single and multi-line",
+			content: `LAYER git@github.com:example/first.git
+LAYER git@github.com:example/second.git \
+  TARGET output
+LAYER git@github.com:example/third.git TARGET inline`,
+			expectedLayers: 3,
+			checkLayer: func(t *testing.T, layers []Layer) {
+				if layers[0].Target != "." {
+					t.Errorf("First layer: expected target '.', got %s", layers[0].Target)
+				}
+				if layers[1].Target != "output" {
+					t.Errorf("Second layer: expected target 'output', got %s", layers[1].Target)
+				}
+				if layers[2].Target != "inline" {
+					t.Errorf("Third layer: expected target 'inline', got %s", layers[2].Target)
+				}
+			},
+		},
+		{
+			name: "Unterminated continuation",
+			content: `LAYER git@github.com:example/repo.git \
+  TARGET output \`,
+			expectError:   true,
+			errorContains: "unterminated line continuation",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			otterfilePath := filepath.Join(tempDir, tt.name+"-Otterfile")
+			err := os.WriteFile(otterfilePath, []byte(tt.content), 0o644)
+			if err != nil {
+				t.Fatalf("Failed to create test Otterfile: %v", err)
+			}
+
+			config, err := ParseOtterfile(otterfilePath)
+
+			if tt.expectError {
+				if err == nil {
+					t.Fatal("Expected error but got none")
+				}
+				if tt.errorContains != "" && !contains(err.Error(), tt.errorContains) {
+					t.Errorf("Expected error containing '%s', got: %v", tt.errorContains, err)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			if len(config.Layers) != tt.expectedLayers {
+				t.Errorf("Expected %d layers, got %d", tt.expectedLayers, len(config.Layers))
+			}
+
+			if tt.checkLayer != nil {
+				tt.checkLayer(t, config.Layers)
+			}
+		})
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
+}
+
+func containsHelper(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
 func TestFileOperationsIgnore(t *testing.T) {
 	fileOps := util.NewFileOperations()
 

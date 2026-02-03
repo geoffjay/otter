@@ -8,7 +8,9 @@ ON_ERROR: ["echo 'Build failed - cleaning up...'", "rm -rf temp", "echo 'Cleanup
 
 # Documentation layer with hooks for static site generation
 # This would be perfect for your use case!
-LAYER ./docs-layer TARGET docs AFTER ["echo 'Documentation site ready!'"]
+LAYER ./docs-layer \
+  TARGET docs \
+  AFTER ["echo 'Documentation site ready!'"]
 
 # Development tools layer with setup hooks
 LAYER ./dev-tools BEFORE ["echo 'Setting up development environment...'"] AFTER ["chmod +x scripts/*.sh", "./scripts/setup-dev-env.sh"]

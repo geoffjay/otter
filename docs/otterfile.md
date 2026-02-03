@@ -5,17 +5,36 @@ This document covers the complete syntax and features available.
 
 ## Basic Syntax
 
-An Otterfile uses a Dockerfile-like syntax with commands written in uppercase. Each command operates on a single line
-(multi-line commands are not currently supported).
+An Otterfile uses a Dockerfile-like syntax with commands written in uppercase.
 
 ### Comments
 
 Lines starting with `#` are treated as comments and are ignored during parsing.
 
+### Line Continuation
+
+For long commands, you can use backslash (`\`) at the end of a line to continue on the next line. This is especially
+useful for LAYER commands with multiple parameters:
+
+```dockerfile
+# Single line (can get long)
+LAYER git@github.com:example/repo.git TARGET config IF env=production AFTER ["setup.sh"]
+
+# Multi-line with continuation (more readable)
+LAYER git@github.com:example/repo.git \
+  TARGET config \
+  IF env=production \
+  AFTER ["./scripts/setup.sh"]
+```
+
+The backslash must be the last character on the line (no trailing spaces). Continuation lines are joined with spaces.
+
 ```dockerfile
 # This is a comment
 LAYER git@github.com:example/base.git
 ```
+
+**Note**: Comments cannot appear on continuation lines - they must be on their own lines.
 
 ## VAR Command
 

@@ -50,19 +50,56 @@ func ParseOtterfile(filename string) (*OtterfileConfig, error) {
 
 	scanner := bufio.NewScanner(file)
 	lineNumber := 0
+	startLineNumber := 0
+	var continuedLine strings.Builder
 
 	for scanner.Scan() {
 		lineNumber++
-		line := strings.TrimSpace(scanner.Text())
+		rawLine := scanner.Text()
+		line := strings.TrimSpace(rawLine)
 
-		// Skip empty lines and comments
-		if line == "" || strings.HasPrefix(line, "#") {
+		// Skip empty lines and comments (but only if not in a continuation)
+		if continuedLine.Len() == 0 && (line == "" || strings.HasPrefix(line, "#")) {
 			continue
 		}
 
-		if err := parseLine(line, config, lineNumber); err != nil {
-			return nil, fmt.Errorf("error on line %d: %w", lineNumber, err)
+		// Check for line continuation (backslash at end)
+		if strings.HasSuffix(line, "\\") {
+			// Remove the backslash and add to continued line
+			line = strings.TrimSuffix(line, "\\")
+			line = strings.TrimSpace(line)
+			if continuedLine.Len() == 0 {
+				startLineNumber = lineNumber
+			}
+			if continuedLine.Len() > 0 {
+				continuedLine.WriteString(" ")
+			}
+			continuedLine.WriteString(line)
+			continue
 		}
+
+		// Complete line (either standalone or end of continuation)
+		var fullLine string
+		var reportLineNumber int
+		if continuedLine.Len() > 0 {
+			continuedLine.WriteString(" ")
+			continuedLine.WriteString(line)
+			fullLine = continuedLine.String()
+			reportLineNumber = startLineNumber
+			continuedLine.Reset()
+		} else {
+			fullLine = line
+			reportLineNumber = lineNumber
+		}
+
+		if err := parseLine(fullLine, config, reportLineNumber); err != nil {
+			return nil, fmt.Errorf("error on line %d: %w", reportLineNumber, err)
+		}
+	}
+
+	// Check for unterminated line continuation
+	if continuedLine.Len() > 0 {
+		return nil, fmt.Errorf("error on line %d: unterminated line continuation", startLineNumber)
 	}
 
 	if err := scanner.Err(); err != nil {
