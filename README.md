@@ -1,3 +1,14 @@
+[![Lint][lint-badge]][lint-url]
+[![Build][build-badge]][build-url]
+[![MIT licensed][mit-badge]][mit-url]
+
+[lint-badge]: https://github.com/geoffjay/otter/actions/workflows/lint.yml/badge.svg
+[lint-url]: https://github.com/geoffjay/otter/actions/workflows/lint.yml
+[build-badge]: https://github.com/geoffjay/otter/actions/workflows/build.yml/badge.svg
+[build-url]: https://github.com/geoffjay/otter/actions/workflows/build.yml
+[mit-badge]: https://img.shields.io/badge/license-MIT-blue.svg
+[mit-url]: https://github.com/geoffjay/otter/blob/main/LICENSE
+
 # Otter
 
 Otter simplifies development environment setup through a layer concept that pulls other templates containing files into the project it's run inside of.
