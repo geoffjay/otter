@@ -175,26 +175,4 @@ echo "  2. View the release at: https://github.com/geoffjay/otter/releases/tag/$
 echo "  3. Create GitHub release notes at: https://github.com/geoffjay/otter/releases/new?tag=$NEW_VERSION"
 echo ""
 
-# Step 7: Create GitHub release (if gh CLI is available)
-if command -v gh &> /dev/null; then
-  read -p "Create GitHub release now? (y/N) " -n 1 -r
-  echo
-  if [[ $REPLY =~ ^[Yy]$ ]]; then
-    print_step "Step 7: Creating GitHub release"
-    print_info "Creating release on GitHub..."
-    gh release create "$NEW_VERSION" \
-      --title "Release $NEW_VERSION" \
-      --notes "$CHANGELOG" \
-      --verify-tag
-    print_success "GitHub release created!"
-    echo ""
-    print_info "View release at: https://github.com/geoffjay/otter/releases/tag/$NEW_VERSION"
-  fi
-else
-  print_info "GitHub CLI (gh) not installed. To create release manually:"
-  echo "  gh release create $NEW_VERSION --title \"Release $NEW_VERSION\" --notes-file <(echo \"$CHANGELOG\")"
-  echo "  Or visit: https://github.com/geoffjay/otter/releases/new?tag=$NEW_VERSION"
-fi
-
-echo ""
 print_success "🎉 Release process complete!"

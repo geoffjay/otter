@@ -46,6 +46,7 @@ Follow [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PATCH):
 - **PATCH**: Backwards-compatible bug fixes
 
 **Examples:**
+
 - `v1.0.0` → `v2.0.0` (breaking changes)
 - `v1.0.0` → `v1.1.0` (new features)
 - `v1.0.0` → `v1.0.1` (bug fixes)
@@ -118,21 +119,6 @@ git push origin $NEW_VERSION
 
 # Or push all tags
 git push origin --tags
-```
-
-### Step 6: Create GitHub Release (Optional)
-
-If using GitHub, create a release from the tag:
-
-```bash
-# Using GitHub CLI (gh)
-gh release create $NEW_VERSION \
-  --title "Release $NEW_VERSION" \
-  --notes "$(git tag -l --format='%(contents)' $NEW_VERSION)" \
-  --verify-tag
-
-# Or manually visit:
-# https://github.com/geoffjay/otter/releases/new?tag=$NEW_VERSION
 ```
 
 ## Automated Release Script
@@ -253,30 +239,6 @@ echo "  2. Create GitHub release at: https://github.com/geoffjay/otter/releases/
 echo "  3. Update documentation if needed"
 echo "  4. Announce the release"
 
-# Step 7: Create GitHub release (if gh CLI is available)
-if command -v gh &> /dev/null; then
-  read -p "Create GitHub release now? (y/N) " -n 1 -r
-  echo
-  if [[ $REPLY =~ ^[Yy]$ ]]; then
-    print_info "Creating GitHub release..."
-    gh release create "$NEW_VERSION" \
-      --title "Release $NEW_VERSION" \
-      --notes "$CHANGELOG" \
-      --verify-tag
-    print_success "GitHub release created!"
-  fi
-else
-  print_info "GitHub CLI (gh) not found. Create release manually at:"
-  echo "  https://github.com/geoffjay/otter/releases/new?tag=$NEW_VERSION"
-fi
-```
-
-Make the script executable:
-
-```bash
-chmod +x scripts/release.sh
-```
-
 ## Usage Examples
 
 ### Manual Release
@@ -308,12 +270,6 @@ git tag -a $NEW_VERSION -m "Release $NEW_VERSION
 # 4. Push tag
 git push origin $NEW_VERSION
 
-# 5. Create GitHub release
-gh release create $NEW_VERSION \
-  --title "Release $NEW_VERSION" \
-  --notes-file CHANGELOG.md
-```
-
 ### Automated Release
 
 ```bash
@@ -329,7 +285,6 @@ gh release create $NEW_VERSION \
 # 6. Generate changelog from commits
 # 7. Show changelog and ask for confirmation
 # 8. Create and push tag
-# 9. Optionally create GitHub release
 ```
 
 ## Changelog Format
@@ -366,9 +321,6 @@ git tag -d v1.2.3
 
 # Delete remote tag
 git push origin :refs/tags/v1.2.3
-
-# Delete GitHub release (if created)
-gh release delete v1.2.3 --yes
 ```
 
 ## Tips
@@ -386,7 +338,6 @@ gh release delete v1.2.3 --yes
 - `make test` - Run all tests
 - `make build` - Build the project
 - `make build-all` - Build for all platforms
-- `gh release create` - Create GitHub release (requires GitHub CLI)
 
 ## References
 
