@@ -16,6 +16,7 @@ type Layer struct {
 	Target     string            // Optional target directory, defaults to root
 	Condition  string            // Optional condition for applying the layer (e.g., "env=development")
 	Template   map[string]string // Optional template variables to pass to the layer
+	Delims     [2]string         // Optional custom template delimiters [left, right], defaults to {{ and }}
 	Before     []string          // Commands to run before applying the layer
 	After      []string          // Commands to run after applying the layer
 }
@@ -191,6 +192,7 @@ func parseLayerCommand(args []string, config *OtterfileConfig) error {
 		Repository: args[0],
 		Target:     ".", // Default to current directory
 		Template:   make(map[string]string),
+		Delims:     [2]string{"{{", "}}"},
 	}
 
 	// Parse optional TARGET, IF, and TEMPLATE arguments
@@ -229,6 +231,12 @@ func parseLayerCommand(args []string, config *OtterfileConfig) error {
 				}
 				i = j // Move the outer loop index forward
 			}
+		case "DELIMS":
+			if i+2 >= len(args) {
+				return fmt.Errorf("DELIMS requires left and right delimiter arguments")
+			}
+			layer.Delims = [2]string{args[i+1], args[i+2]}
+			i += 2 // Skip the two delimiter arguments
 		case "BEFORE":
 			if i+1 >= len(args) {
 				return fmt.Errorf("BEFORE requires a command array")

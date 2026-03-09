@@ -71,7 +71,7 @@ The `LAYER` command is the primary command for defining layers to be applied to 
 ### Basic Syntax
 
 ```dockerfile
-LAYER <repository-url> [TARGET <target-path>] [IF <condition>] [TEMPLATE <key=value>...]
+LAYER <repository-url> [TARGET <target-path>] [IF <condition>] [TEMPLATE <key=value>...] [DELIMS <left> <right>]
 ```
 
 ### Parameters
@@ -84,6 +84,7 @@ LAYER <repository-url> [TARGET <target-path>] [IF <condition>] [TEMPLATE <key=va
 - **`TARGET <target-path>`** (optional): The directory where layer files should be copied (default: current directory)
 - **`IF <condition>`** (optional): A condition that must be met for the layer to be applied
 - **`TEMPLATE <key=value>...`** (optional): Template variables to pass to the layer
+- **`DELIMS <left> <right>`** (optional): Custom template delimiters (default: `{{` and `}}`)
 
 ### Examples
 
@@ -538,6 +539,67 @@ LAYER git@github.com:otter-layers/dockerfile.git TEMPLATE go_version=${GO_VERSIO
 # Multiple template variables
 LAYER git@github.com:otter-layers/k8s-config.git TEMPLATE service=${PROJECT_NAME} version=v1.0 replicas=3
 ```
+
+### Custom Template Delimiters
+
+By default, template variables in layer files use Go's standard `{{ }}` delimiters. If your layer files need to output
+literal `{{ }}` syntax (e.g., for Jinja2 templates, GitHub Actions expressions, or Helm charts), you can configure
+custom delimiters with the `DELIMS` parameter so that the literal `{{ }}` content passes through unchanged.
+
+#### Syntax
+
+```dockerfile
+LAYER <repository-url> TEMPLATE <key=value>... DELIMS <left> <right>
+```
+
+The two arguments after `DELIMS` specify the left and right delimiters to use instead of `{{` and `}}`.
+
+#### Examples
+
+```dockerfile
+# Layer files use << >> for otter template variables
+# Any {{ }} in the files will be output literally
+LAYER git@github.com:otter-layers/helm-chart.git \
+  TEMPLATE app_name=my-app release=v1.0 \
+  DELIMS << >>
+
+# Layer files use <% %> for otter template variables
+LAYER git@github.com:otter-layers/ansible-roles.git \
+  TEMPLATE env=production \
+  DELIMS <% %>
+```
+
+With the first example above, a layer file like this:
+
+```yaml
+# values.yaml in the layer repo
+name: << .app_name >>
+labels:
+  app: {{ .Release.Name }}    # Helm syntax, passed through literally
+  version: << .release >>
+```
+
+Would produce:
+
+```yaml
+name: my-app
+labels:
+  app: {{ .Release.Name }}    # Preserved as-is
+  version: v1.0
+```
+
+#### When to Use Custom Delimiters
+
+Custom delimiters are useful when your layer files contain content that uses `{{ }}` for purposes other than Otter
+templating:
+
+- **Helm charts** - `{{ .Values.foo }}`
+- **Jinja2 templates** - `{{ variable }}`
+- **GitHub Actions expressions** - `${{ github.ref }}`
+- **Go templates** - `{{ .Field }}`
+- **Ansible** - `{{ ansible_var }}`
+
+If your layer files don't contain any literal `{{ }}` that should be preserved, you don't need to set custom delimiters.
 
 ### Variable Priority
 

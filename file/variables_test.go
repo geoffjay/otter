@@ -324,6 +324,64 @@ func TestParseLayerCommand_WithTemplate(t *testing.T) {
 	}
 }
 
+func TestParseLayerCommand_WithDelims(t *testing.T) {
+	tests := []struct {
+		name           string
+		args           []string
+		expectedDelims [2]string
+		expectError    bool
+	}{
+		{
+			name:           "Default delimiters when DELIMS not specified",
+			args:           []string{"git@github.com:example/repo.git", "TEMPLATE", "foo=bar"},
+			expectedDelims: [2]string{"{{", "}}"},
+		},
+		{
+			name:           "Custom delimiters",
+			args:           []string{"git@github.com:example/repo.git", "DELIMS", "<<", ">>", "TEMPLATE", "foo=bar"},
+			expectedDelims: [2]string{"<<", ">>"},
+		},
+		{
+			name:           "Custom delimiters after TEMPLATE",
+			args:           []string{"git@github.com:example/repo.git", "TEMPLATE", "foo=bar", "DELIMS", "<%", "%>"},
+			expectedDelims: [2]string{"<%", "%>"},
+		},
+		{
+			name:        "DELIMS with missing right delimiter",
+			args:        []string{"git@github.com:example/repo.git", "DELIMS", "<<"},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &OtterfileConfig{
+				Variables: make(map[string]string),
+				Layers:    make([]Layer, 0),
+			}
+
+			err := parseLayerCommand(tt.args, config)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			layer := config.Layers[0]
+			if layer.Delims != tt.expectedDelims {
+				t.Errorf("Expected delims %v, got %v", tt.expectedDelims, layer.Delims)
+			}
+		})
+	}
+}
+
 func TestParseOtterfileWithVariables(t *testing.T) {
 	// Create a temporary Otterfile with variables and templating
 	tempDir := t.TempDir()

@@ -255,7 +255,7 @@ func PromptForConfirmation(prompt string) bool {
 
 // CopyLayer copies files from a layer directory to the target directory
 // If force is false and there are file conflicts, the user will be prompted for confirmation
-func (f *FileOperations) CopyLayer(layerPath, targetPath string, projectRoot string, templateVars map[string]string, force bool) error {
+func (f *FileOperations) CopyLayer(layerPath, targetPath string, projectRoot string, templateVars map[string]string, delims [2]string, force bool) error {
 	// Ensure target directory exists
 	if err := os.MkdirAll(targetPath, 0755); err != nil {
 		return fmt.Errorf("failed to create target directory %s: %w", targetPath, err)
@@ -335,13 +335,13 @@ func (f *FileOperations) CopyLayer(layerPath, targetPath string, projectRoot str
 			return os.MkdirAll(destPath, info.Mode())
 		} else {
 			// Copy file with template processing if variables are provided
-			return f.copyFile(srcPath, destPath, info.Mode(), templateVars)
+			return f.copyFile(srcPath, destPath, info.Mode(), templateVars, delims)
 		}
 	})
 }
 
 // copyFile copies a single file from src to dst with optional template processing
-func (f *FileOperations) copyFile(src, dst string, mode os.FileMode, templateVars map[string]string) error {
+func (f *FileOperations) copyFile(src, dst string, mode os.FileMode, templateVars map[string]string, delims [2]string) error {
 	// Check if destination file exists and prompt for overwrite
 	if _, err := os.Stat(dst); err == nil {
 		fmt.Printf("  Overwriting: %s\n", dst)
@@ -364,9 +364,9 @@ func (f *FileOperations) copyFile(src, dst string, mode os.FileMode, templateVar
 	var finalContent []byte
 
 	// Check if we have template variables and the file contains template syntax
-	if len(templateVars) > 0 && f.containsTemplateSyntax(string(srcContent)) {
+	if len(templateVars) > 0 && f.containsTemplateSyntax(string(srcContent), delims) {
 		// Process the file as a template
-		processedContent, err := f.processTemplate(string(srcContent), templateVars, src)
+		processedContent, err := f.processTemplate(string(srcContent), templateVars, src, delims)
 		if err != nil {
 			return fmt.Errorf("failed to process template %s: %w", src, err)
 		}
@@ -385,16 +385,15 @@ func (f *FileOperations) copyFile(src, dst string, mode os.FileMode, templateVar
 	return nil
 }
 
-// containsTemplateSyntax checks if content contains Go template syntax
-func (f *FileOperations) containsTemplateSyntax(content string) bool {
-	// Check for Go template syntax: {{ .variable }} or {{ .function }}
-	return strings.Contains(content, "{{") && strings.Contains(content, "}}")
+// containsTemplateSyntax checks if content contains template syntax using the given delimiters
+func (f *FileOperations) containsTemplateSyntax(content string, delims [2]string) bool {
+	return strings.Contains(content, delims[0]) && strings.Contains(content, delims[1])
 }
 
-// processTemplate processes a template string with the provided variables
-func (f *FileOperations) processTemplate(content string, templateVars map[string]string, filename string) (string, error) {
-	// Create a new template
-	tmpl, err := template.New(filepath.Base(filename)).Parse(content)
+// processTemplate processes a template string with the provided variables and delimiters
+func (f *FileOperations) processTemplate(content string, templateVars map[string]string, filename string, delims [2]string) (string, error) {
+	// Create a new template with custom delimiters
+	tmpl, err := template.New(filepath.Base(filename)).Delims(delims[0], delims[1]).Parse(content)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %w", err)
 	}

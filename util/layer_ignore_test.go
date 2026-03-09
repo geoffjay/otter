@@ -65,7 +65,7 @@ func TestLayerSpecificIgnorePatterns(t *testing.T) {
 	}
 
 	// Copy layer to target (force=true to skip prompts in tests)
-	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot, make(map[string]string), true)
+	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot, make(map[string]string), [2]string{"{{", "}}"}, true)
 	if err != nil {
 		t.Fatalf("Failed to copy layer: %v", err)
 	}
@@ -217,7 +217,7 @@ func TestCombinedIgnorePatterns(t *testing.T) {
 	}
 
 	// Copy layer (force=true to skip prompts in tests)
-	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot, make(map[string]string), true)
+	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot, make(map[string]string), [2]string{"{{", "}}"}, true)
 	if err != nil {
 		t.Fatalf("Failed to copy layer: %v", err)
 	}
@@ -308,7 +308,7 @@ func TestCriticalFileProtection(t *testing.T) {
 	}
 
 	// Copy layer to target (force=true to skip prompts in tests)
-	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot, make(map[string]string), true)
+	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot, make(map[string]string), [2]string{"{{", "}}"}, true)
 	if err != nil {
 		t.Fatalf("Failed to copy layer: %v", err)
 	}
@@ -389,7 +389,7 @@ This is a template file for {{.title}}.`
 		t.Fatalf("Failed to load ignore patterns: %v", err)
 	}
 
-	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot, templateVars, true)
+	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot, templateVars, [2]string{"{{", "}}"}, true)
 	if err != nil {
 		t.Fatalf("Failed to copy layer: %v", err)
 	}
@@ -412,6 +412,55 @@ This is a template file for My Awesome.`
 
 	if string(processedContent) != expectedContent {
 		t.Errorf("Template processing failed.\nExpected:\n%s\n\nGot:\n%s", expectedContent, string(processedContent))
+	}
+}
+
+func TestCopyLayerWithCustomDelimiters(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create project root with .otterignore
+	projectRoot := filepath.Join(tempDir, "project")
+	os.MkdirAll(projectRoot, 0755)
+
+	// Create a layer with a file that uses custom delimiters AND literal {{ }}
+	layerDir := filepath.Join(tempDir, "layer")
+	os.MkdirAll(layerDir, 0755)
+
+	// This file uses << >> for template vars but has literal {{ }} that should be preserved
+	content := `name: << .name >>
+config:
+  handler: {{ .Request }}
+  version: << .version >>`
+
+	err := os.WriteFile(filepath.Join(layerDir, "config.yaml"), []byte(content), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	targetDir := filepath.Join(tempDir, "target")
+	templateVars := map[string]string{
+		"name":    "myapp",
+		"version": "1.0",
+	}
+
+	fileOps := NewFileOperations()
+	err = fileOps.CopyLayer(layerDir, targetDir, projectRoot, templateVars, [2]string{"<<", ">>"}, true)
+	if err != nil {
+		t.Fatalf("Failed to copy layer: %v", err)
+	}
+
+	processedContent, err := os.ReadFile(filepath.Join(targetDir, "config.yaml"))
+	if err != nil {
+		t.Fatalf("Failed to read processed file: %v", err)
+	}
+
+	expected := `name: myapp
+config:
+  handler: {{ .Request }}
+  version: 1.0`
+
+	if string(processedContent) != expected {
+		t.Errorf("Custom delimiter template processing failed.\nExpected:\n%s\n\nGot:\n%s", expected, string(processedContent))
 	}
 }
 

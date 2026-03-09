@@ -151,7 +151,7 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  Target directory: %s\n", targetPath)
 
 		// Copy files from layer to target
-		if err := fileOps.CopyLayer(layerPath, targetPath, currentDir, layer.Template, forceApply); err != nil {
+		if err := fileOps.CopyLayer(layerPath, targetPath, currentDir, layer.Template, layer.Delims, forceApply); err != nil {
 			if len(config.OnError) > 0 {
 				cmdExec.ExecuteCommands(config.OnError, "error cleanup")
 			}
